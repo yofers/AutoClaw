@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AutoOpenClaw</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="masthead">
+        <div class="masthead-copy">
+          <p class="eyebrow">LOCAL CONTROL PANEL</p>
+          <h1>AutoOpenClaw</h1>
+          <p class="hero-copy">
+            面向本机运维的 OpenClaw 控制面板。把安装、初始化、Gateway 状态和
+            <code>~/.openclaw/openclaw.json</code> 维护放在同一个工作面板里。
+          </p>
+          <p class="masthead-note">本地优先、状态清晰、动作可回退，不假设远程托管场景。</p>
+          <div class="masthead-summary">
+            <article class="summary-card" id="install-summary-card">
+              <span class="summary-label">OpenClaw</span>
+              <strong class="summary-value" id="hero-install-state">加载中</strong>
+              <span class="summary-detail" id="hero-install-detail">等待检测安装状态</span>
+            </article>
+            <article class="summary-card" id="gateway-summary-card">
+              <span class="summary-label">Gateway</span>
+              <strong class="summary-value" id="hero-gateway-state">加载中</strong>
+              <span class="summary-detail" id="hero-gateway-detail">等待检测服务状态</span>
+            </article>
+            <article class="summary-card" id="config-summary-card">
+              <span class="summary-label">配置文件</span>
+              <strong class="summary-value" id="hero-config-state">加载中</strong>
+              <span class="summary-detail" id="hero-config-detail">等待读取配置路径</span>
+            </article>
+          </div>
+        </div>
+
+        <div class="masthead-actions">
+          <button class="solid" id="install-button" data-action="install">安装 OpenClaw</button>
+          <button class="ghost" id="refresh-status">刷新状态</button>
+          <a
+            class="link-button"
+            id="dashboard-link"
+            href="http://127.0.0.1:18789/"
+            target="_blank"
+            rel="noreferrer"
+            >打开 Dashboard</a
+          >
+          <button class="danger" data-action="uninstall">卸载 OpenClaw</button>
+        </div>
+      </header>
+
+      <section class="app-grid">
+        <section class="main-column">
+          <article class="section-block status-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Overview</p>
+                <h2>环境状态</h2>
+              </div>
+              <span class="chip" id="platform-chip">加载中</span>
+            </div>
+            <p class="panel-note panel-note-soft">系统依赖、安装版本和本地路径集中显示在这里，用于快速确认当前运行环境。</p>
+            <dl class="status-list" id="status-list"></dl>
+          </article>
+
+          <article class="section-block operations-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Operations</p>
+                <h2>运维</h2>
+              </div>
+              <span class="chip">常用操作</span>
+            </div>
+            <p class="panel-note panel-note-soft">先确认 Gateway 服务状态，再执行启动、重启或诊断动作。</p>
+            <div class="gateway-overview">
+              <div class="gateway-card" id="gateway-installed-card">
+                <span class="gateway-label">Gateway 服务已安装</span>
+                <strong class="gateway-value" id="gateway-service-installed">加载中</strong>
+              </div>
+              <div class="gateway-card" id="gateway-loaded-card">
+                <span class="gateway-label">Gateway 服务已加载</span>
+                <strong class="gateway-value" id="gateway-service-loaded">加载中</strong>
+              </div>
+            </div>
+            <div class="action-grid">
+              <button class="action-tile" data-action="doctor">
+                <span class="action-title">Doctor</span>
+                <span class="action-meta">检查依赖、安装路径和本地环境。</span>
+              </button>
+              <button class="action-tile" data-action="status">
+                <span class="action-title">Gateway 状态</span>
+                <span class="action-meta">读取当前服务状态和 Gateway 输出。</span>
+              </button>
+              <button class="action-tile" data-action="start">
+                <span class="action-title">启动 Gateway</span>
+                <span class="action-meta">必要时会先补装服务，再启动中台。</span>
+              </button>
+              <button class="action-tile" data-action="restart">
+                <span class="action-title">重启 Gateway</span>
+                <span class="action-meta">用于配置调整后的快速重载。</span>
+              </button>
+              <button class="action-tile" data-action="stop">
+                <span class="action-title">停止 Gateway</span>
+                <span class="action-meta">停止本地中台，保留安装与配置。</span>
+              </button>
+              <button class="action-tile" data-action="dashboard">
+                <span class="action-title">打印 Dashboard 链接</span>
+                <span class="action-meta">确认当前可访问的本地入口地址。</span>
+              </button>
+            </div>
+            <p class="panel-note panel-note-soft">
+              安装动作默认调用 OpenClaw 官方安装器。macOS / Linux 使用本地前缀安装，
+              Windows 调官方 PowerShell 脚本。启动 Gateway 时，如果服务缺失，会先尝试安装服务。
+            </p>
+          </article>
+
+          <article class="section-block wizard-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Onboarding</p>
+                <h2>初始化向导</h2>
+              </div>
+              <span class="chip" id="wizard-chip">准备中</span>
+            </div>
+            <p class="panel-note panel-note-soft">
+              这里调用 <code>openclaw onboard --non-interactive</code> 完成最常用的本地初始化，
+              优先让 Gateway 和 Dashboard 可用，而不是把交互式 CLI 直接塞进浏览器。
+            </p>
+            <div class="onboard-strip">
+              <div class="onboard-step">
+                <span class="onboard-index">1</span>
+                <div>
+                  <strong>选择 Provider</strong>
+                  <p>不接模型时可跳过，先把本地中台跑起来。</p>
+                </div>
+              </div>
+              <div class="onboard-step">
+                <span class="onboard-index">2</span>
+                <div>
+                  <strong>确认 Gateway</strong>
+                  <p>绑定方式、端口和认证模式都可以保留默认。</p>
+                </div>
+              </div>
+              <div class="onboard-step">
+                <span class="onboard-index">3</span>
+                <div>
+                  <strong>运行初始化</strong>
+                  <p>接受风险说明后，直接生成本地可用配置。</p>
+                </div>
+              </div>
+            </div>
+
+            <form id="onboard-form" class="wizard-form">
+              <section class="form-section">
+                <div class="form-section-head">
+                  <div>
+                    <h3>Provider 与工作区</h3>
+                    <p>首次接入时只需要决定是否配置模型，以及 workspace 放在哪里。</p>
+                  </div>
+                </div>
+                <div class="wizard-grid">
+                  <label class="field">
+                    <span>模型认证</span>
+                    <select id="auth-choice" name="authChoice">
+                      <option value="skip">暂不配置模型 Provider</option>
+                      <option value="openai-api-key">OpenAI API Key</option>
+                      <option value="anthropic-api-key">Anthropic API Key</option>
+                      <option value="gemini-api-key">Gemini API Key</option>
+                      <option value="openrouter-api-key">OpenRouter API Key</option>
+                    </select>
+                  </label>
+
+                  <label class="field" id="model-api-key-field">
+                    <span>模型 API Key</span>
+                    <input
+                      id="model-api-key"
+                      name="modelApiKey"
+                      type="password"
+                      autocomplete="off"
+                      placeholder="只在选择模型 Provider 时需要"
+                    />
+                  </label>
+
+                  <label class="field field-span-2">
+                    <span>Workspace</span>
+                    <input
+                      id="workspace-input"
+                      name="workspace"
+                      type="text"
+                      placeholder="留空时使用默认值 ~/.openclaw/workspace"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section class="form-section">
+                <div class="form-section-head">
+                  <div>
+                    <h3>Gateway</h3>
+                    <p>绑定、端口和认证模式都支持默认值；token 留空时会自动生成。</p>
+                  </div>
+                </div>
+                <div class="wizard-grid">
+                  <label class="field">
+                    <span>Gateway 绑定</span>
+                    <select id="gateway-bind" name="gatewayBind">
+                      <option value="loopback">loopback</option>
+                      <option value="lan">lan</option>
+                      <option value="tailnet">tailnet</option>
+                      <option value="auto">auto</option>
+                      <option value="custom">custom</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Gateway 端口</span>
+                    <input
+                      id="gateway-port"
+                      name="gatewayPort"
+                      type="number"
+                      min="1"
+                      max="65535"
+                      placeholder="留空时使用默认值 18789"
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Gateway 认证</span>
+                    <select id="gateway-auth" name="gatewayAuth">
+                      <option value="token">token</option>
+                      <option value="password">password</option>
+                    </select>
+                  </label>
+
+                  <label class="field" id="gateway-token-field">
+                    <span>Gateway Token</span>
+                    <input
+                      id="gateway-token"
+                      name="gatewayToken"
+                      type="text"
+                      autocomplete="off"
+                      placeholder="留空时自动生成"
+                    />
+                  </label>
+
+                  <label class="field field-span-2" id="gateway-password-field">
+                    <span>Gateway Password</span>
+                    <input
+                      id="gateway-password"
+                      name="gatewayPassword"
+                      type="password"
+                      autocomplete="off"
+                      placeholder="选择 password 模式后必填"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section class="form-section form-section-compact">
+                <div class="form-section-head">
+                  <div>
+                    <h3>风险与托管</h3>
+                    <p>未填写的默认字段会回退到系统默认值；运行前仍需确认风险说明。</p>
+                  </div>
+                </div>
+                <div class="inline-options">
+                  <label class="switch-row">
+                    <input id="install-daemon" name="installDaemon" type="checkbox" checked />
+                    <span>安装并托管 Gateway daemon</span>
+                  </label>
+                  <label class="switch-row">
+                    <input id="risk-accepted" name="riskAccepted" type="checkbox" />
+                    <span>我理解 agent 具备本机执行能力，并接受对应风险</span>
+                  </label>
+                </div>
+              </section>
+
+              <div class="toolbar">
+                <button class="solid" id="run-onboard" type="submit">运行初始化向导</button>
+                <button class="ghost" id="reload-onboard" type="button">重载默认值</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="section-block console-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Runtime</p>
+                <h2>执行输出</h2>
+              </div>
+              <span class="chip">运行日志</span>
+            </div>
+            <pre id="console-output">等待操作…</pre>
+          </article>
+        </section>
+
+        <aside class="side-column">
+          <article class="section-block editor-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Config</p>
+                <h2>配置编辑器</h2>
+              </div>
+              <span class="chip" id="config-path">读取中</span>
+            </div>
+            <p class="panel-note panel-note-soft">保存后，如果 Gateway 正在运行，大多数配置会自动热重载。</p>
+            <textarea id="config-editor" spellcheck="false"></textarea>
+            <div class="toolbar toolbar-compact">
+              <button class="solid" id="save-config">保存配置</button>
+              <button class="ghost" id="reload-config">重新读取</button>
+            </div>
+          </article>
+
+          <article class="section-block section-block-muted preset-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Templates</p>
+                <h2>配置模板</h2>
+              </div>
+              <span class="chip">JSON5</span>
+            </div>
+            <div class="preset-list">
+              <button class="preset" data-preset="minimal" data-label="最小本地配置">
+                <span class="preset-title">最小本地配置</span>
+                <span class="preset-meta">只保留本地 Gateway 与默认 workspace。</span>
+              </button>
+              <button class="preset" data-preset="lan" data-label="局域网访问模板">
+                <span class="preset-title">局域网访问模板</span>
+                <span class="preset-meta">把 Gateway 暴露到局域网，并保留 token 认证。</span>
+              </button>
+              <button class="preset" data-preset="multiAgent" data-label="多 Agent 模板">
+                <span class="preset-title">多 Agent 模板</span>
+                <span class="preset-meta">预置多个 workspace 与 channel 绑定示例。</span>
+              </button>
+              <button class="preset" data-preset="whitelist" data-label="WhatsApp 白名单模板">
+                <span class="preset-title">WhatsApp 白名单模板</span>
+                <span class="preset-meta">限制来源号码，并为群聊开启 mention 约束。</span>
+              </button>
+            </div>
+          </article>
+
+          <article class="section-block section-block-muted notes-block">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Workflow</p>
+                <h2>首次使用</h2>
+              </div>
+              <span class="chip">快速上手</span>
+            </div>
+            <div class="stack-list">
+              <div class="stack-item">
+                <strong>1. 安装 OpenClaw</strong>
+                <p>先确认安装状态，再执行安装或更新动作，保证本地 CLI 和 Gateway 可用。</p>
+              </div>
+              <div class="stack-item">
+                <strong>2. 运行初始化向导</strong>
+                <p>保留默认值也可以，目标是尽快生成本地可工作的配置并拿到 Dashboard。</p>
+              </div>
+              <div class="stack-item">
+                <strong>3. 用运维与配置继续维护</strong>
+                <p>通过 Gateway 状态、执行输出和配置编辑器做后续调整；更复杂的流程仍可回到 CLI。</p>
+              </div>
+            </div>
+            <p class="panel-note compact-note">需要更完整的流程时，仍可在终端使用 <code>openclaw onboard</code> 或 <code>openclaw configure</code>。</p>
+          </article>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

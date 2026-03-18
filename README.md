@@ -1,0 +1,90 @@
+# AutoOpenClaw
+
+一个本地部署助手，目标是把 OpenClaw 的初装、状态检查和配置编辑收敛到一个入口里。
+
+## 功能
+
+- 自动识别当前系统和常见包管理器
+- 一键调用 OpenClaw 官方安装器
+- 一键卸载 OpenClaw 服务、本地状态和当前安装目录
+- 显示 `Node / curl / git / OpenClaw` 当前状态
+- 在本地网页里直接编辑 `~/.openclaw/openclaw.json`
+- 提供 `doctor / status / gateway start / restart / stop` 固定运维动作
+- 提供几个常用 JSON5 配置模板
+
+## 使用方式
+
+### macOS / Linux
+
+```bash
+chmod +x scripts/bootstrap.sh
+./scripts/bootstrap.sh
+```
+
+### Windows PowerShell
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\bootstrap.ps1
+```
+
+## GitHub 远程启动
+
+上传到 GitHub 后，推荐保留 `scripts/bootstrap.sh` 和 `scripts/bootstrap.ps1` 作为统一入口。
+
+### macOS / Linux
+
+```bash
+AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/bootstrap.sh)
+```
+
+### Windows PowerShell
+
+```powershell
+$env:AUTOOPENCLAW_REPO = "<user>/<repo>"
+$env:AUTOOPENCLAW_REF = "<tag-or-branch>"
+irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/bootstrap.ps1 | iex
+```
+
+脚本会优先这样处理：
+
+1. 如果当前目录就是完整项目，直接使用本地项目文件。
+2. 如果不是本地项目，但提供了 `AUTOOPENCLAW_REPO`，就从 GitHub 拉取对应版本到临时目录后运行。
+3. 如果本地已安装 `openclaw`，网页内的运维、初始化和更新动作会直接复用该 `openclaw`。
+
+默认会启动本地管理页：
+
+```text
+http://127.0.0.1:31870/
+```
+
+## 目录
+
+- `scripts/bootstrap.sh`: macOS / Linux 一键入口
+- `scripts/bootstrap.ps1`: Windows 一键入口
+- `server/index.js`: 轻量本地服务，负责状态探测、调用官方安装器、读写配置
+- `public/`: 本地网页
+
+## 已知约束
+
+- 当前网页里的配置编辑器是原始 JSON5 编辑器，不做 schema 级联表单渲染。
+- Windows 平台按官方建议，实际运行 OpenClaw 时更推荐 WSL2；这里仍保留了 PowerShell 安装入口。
+- OpenClaw 的完整配置能力本身已经存在于官方 Dashboard Config Tab，本工具更偏向“统一入口”和“开箱部署”。
+- 远程启动模式依赖 GitHub 仓库公开可访问；如果未安装 `git`，脚本会回退到归档下载。
+
+## 发布建议
+
+推荐把仓库发布到 GitHub，并用 `tag` 做稳定分发，而不是直接指向 `main`。
+
+建议流程：
+
+1. 上传仓库到 GitHub。
+2. 创建版本标签，例如 `v0.1.0`。
+3. README 中所有远程启动命令都使用该标签。
+4. 后续更新时发布新标签，而不是修改旧标签对应内容。
+
+## 参考
+
+- 安装文档: https://docs.openclaw.ai/install
+- 配置文档: https://docs.openclaw.ai/gateway/configuration
+- Dashboard 文档: https://docs.openclaw.ai/dashboard

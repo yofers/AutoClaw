@@ -1,0 +1,13 @@
+{
+  "name": "auto-openclaw",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local OpenClaw deployment helper with a built-in config editor.",
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node --check server/index.js && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
