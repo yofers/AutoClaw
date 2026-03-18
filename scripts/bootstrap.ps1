@@ -4,7 +4,8 @@ $ScriptRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Pat
 $RootDir = if ($env:AUTOOPENCLAW_ROOT_DIR) { $env:AUTOOPENCLAW_ROOT_DIR } else { $ScriptRoot }
 $HostIp = if ($env:HOST) { $env:HOST } else { "127.0.0.1" }
 $Port = if ($env:PORT) { $env:PORT } else { "31870" }
-$RemoteRepo = if ($env:AUTOOPENCLAW_REPO) { $env:AUTOOPENCLAW_REPO } else { $null }
+$DefaultRemoteRepo = "yofers/AutoClaw"
+$RemoteRepo = if ($env:AUTOOPENCLAW_REPO) { $env:AUTOOPENCLAW_REPO } else { $DefaultRemoteRepo }
 $RemoteRef = if ($env:AUTOOPENCLAW_REF) { $env:AUTOOPENCLAW_REF } else { "main" }
 $CacheRoot = if ($env:AUTOOPENCLAW_CACHE_DIR) { $env:AUTOOPENCLAW_CACHE_DIR } else { Join-Path $env:TEMP "auto-openclaw-bootstrap" }
 
@@ -70,8 +71,8 @@ function Resolve-RootDir {
     return $RootDir
   }
 
-  if (-not $RemoteRepo) {
-    throw "当前不是本地仓库运行，且未设置 AUTOOPENCLAW_REPO。`n如果从 GitHub Raw 执行，请使用:`n`$env:AUTOOPENCLAW_REPO='<user>/<repo>'; `$env:AUTOOPENCLAW_REF='<tag-or-branch>'; irm <raw-bootstrap-url> | iex"
+  if (-not $env:AUTOOPENCLAW_REPO) {
+    Write-Log "当前不是本地仓库运行，未显式设置 AUTOOPENCLAW_REPO，默认回退到 $DefaultRemoteRepo@$RemoteRef。"
   }
 
   if (Test-Command "git") {

@@ -5,7 +5,8 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || pwd)
 ROOT_DIR="${AUTOOPENCLAW_ROOT_DIR:-${SCRIPT_ROOT}}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-31870}"
-REMOTE_REPO="${AUTOOPENCLAW_REPO:-}"
+DEFAULT_REMOTE_REPO="yofers/AutoClaw"
+REMOTE_REPO="${AUTOOPENCLAW_REPO:-${DEFAULT_REMOTE_REPO}}"
 REMOTE_REF="${AUTOOPENCLAW_REF:-main}"
 CACHE_ROOT="${AUTOOPENCLAW_CACHE_DIR:-${TMPDIR:-/tmp}/auto-openclaw-bootstrap}"
 
@@ -203,11 +204,8 @@ resolve_root_dir() {
     return 0
   fi
 
-  if [[ -z "${REMOTE_REPO}" ]]; then
-    log "当前不是本地仓库运行，且未设置 AUTOOPENCLAW_REPO。"
-    log "如果从 GitHub Raw 执行，请使用:"
-    log "AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fsSL <raw-bootstrap-url>)"
-    exit 1
+  if [[ -z "${AUTOOPENCLAW_REPO:-}" ]]; then
+    log "当前不是本地仓库运行，未显式设置 AUTOOPENCLAW_REPO，默认回退到 ${DEFAULT_REMOTE_REPO}@${REMOTE_REF}。"
   fi
 
   if have git; then

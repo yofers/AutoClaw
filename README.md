@@ -34,11 +34,27 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ### macOS / Linux
 
+官方仓库默认可直接这样启动：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/yofers/AutoClaw/main/scripts/bootstrap.sh)
+```
+
+如果你要使用自己的 fork 或指定 tag / branch，再显式传入仓库和版本：
+
 ```bash
 AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/bootstrap.sh)
 ```
 
 ### Windows PowerShell
+
+官方仓库默认可直接这样启动：
+
+```powershell
+irm https://raw.githubusercontent.com/yofers/AutoClaw/main/scripts/bootstrap.ps1 | iex
+```
+
+如果你要使用自己的 fork 或指定 tag / branch，再显式传入仓库和版本：
 
 ```powershell
 $env:AUTOOPENCLAW_REPO = "<user>/<repo>"
@@ -49,7 +65,7 @@ irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/boot
 脚本会优先这样处理：
 
 1. 如果当前目录就是完整项目，直接使用本地项目文件。
-2. 如果不是本地项目，但提供了 `AUTOOPENCLAW_REPO`，就从 GitHub 拉取对应版本到临时目录后运行。
+2. 如果不是本地项目，会默认从 `yofers/AutoClaw` 拉取；显式设置了 `AUTOOPENCLAW_REPO` 时，则优先使用你指定的仓库。
 3. 如果本地已安装 `openclaw`，网页内的运维、初始化和更新动作会直接复用该 `openclaw`。
 
 默认会启动本地管理页：
