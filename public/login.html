@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{APP_TITLE}} 登录</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body class="login-body">
+    <main class="login-shell">
+      <section class="login-panel login-story">
+        <p class="eyebrow">PRIVATE ACCESS</p>
+        <h1 id="login-app-title">{{APP_TITLE}}</h1>
+        <p class="login-copy" id="login-app-subtitle">{{APP_SUBTITLE}}</p>
+        <div class="login-story-grid">
+          <article class="login-story-item">
+            <span class="summary-label">本地控制</span>
+            <strong>安装、状态、配置在同一面板完成</strong>
+            <p>适合开发者或本机运维场景，减少来回切换终端与配置文件。</p>
+          </article>
+          <article class="login-story-item">
+            <span class="summary-label">权限隔离</span>
+            <strong>主面板访问前先做身份校验</strong>
+            <p>登录、会话时长和监听参数都定义在 <code>config/web.yaml</code>。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="login-panel login-form-panel">
+        <div class="login-form-head">
+          <p class="section-kicker">Sign In</p>
+          <h2>登录管理页</h2>
+          <p class="panel-note">输入 <code>config/web.yaml</code> 中配置的用户名和密码。</p>
+        </div>
+
+        <form id="login-form" class="login-form">
+          <label class="field">
+            <span>用户名</span>
+            <input
+              id="login-username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              placeholder="admin"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>密码</span>
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="请输入登录密码"
+              required
+            />
+          </label>
+
+          <p class="login-feedback" id="login-feedback" hidden></p>
+
+          <button class="solid login-submit" id="login-submit" type="submit">进入控制台</button>
+        </form>
+
+        <p class="compact-note login-footnote">
+          如果你修改了 <code>server.host</code> 或 <code>server.port</code>，需要重启管理进程后才会生效。
+        </p>
+      </section>
+    </main>
+
+    <script src="/js/login.js" defer></script>
+  </body>
+</html>

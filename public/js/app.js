@@ -9,6 +9,8 @@ const heroGatewayDetail = document.querySelector("#hero-gateway-detail");
 const configSummaryCard = document.querySelector("#config-summary-card");
 const heroConfigState = document.querySelector("#hero-config-state");
 const heroConfigDetail = document.querySelector("#hero-config-detail");
+const appTitle = document.querySelector("#app-title");
+const appSubtitle = document.querySelector("#app-subtitle");
 const gatewayInstalledCard = document.querySelector("#gateway-installed-card");
 const gatewayLoadedCard = document.querySelector("#gateway-loaded-card");
 const gatewayServiceInstalled = document.querySelector("#gateway-service-installed");
@@ -18,6 +20,7 @@ const configEditor = document.querySelector("#config-editor");
 const configPath = document.querySelector("#config-path");
 const dashboardLink = document.querySelector("#dashboard-link");
 const installButton = document.querySelector("#install-button");
+const logoutButton = document.querySelector("#logout-button");
 const wizardChip = document.querySelector("#wizard-chip");
 const onboardForm = document.querySelector("#onboard-form");
 const authChoiceInput = document.querySelector("#auth-choice");
@@ -231,6 +234,7 @@ function applyBusyState() {
   });
 
   refreshStatusButton.disabled = state.busy;
+  logoutButton.disabled = state.busy;
   saveConfigButton.disabled = state.busy;
   reloadConfigButton.disabled = state.busy;
   reloadOnboardButton.disabled = state.busy;
@@ -285,6 +289,9 @@ function renderStatus(status) {
         ? "有可用更新"
         : "无法判断";
   const items = [
+    ["管理页面", status.manager.url],
+    ["Web 配置", status.manager.configPath],
+    ["Web 登录", boolLabel(status.manager.authEnabled, "已启用", "未启用")],
     ["平台", `${status.system.platform} / ${status.system.arch}`],
     ["系统版本", status.system.release],
     ["Node", status.system.nodeVersion],
@@ -310,6 +317,10 @@ function renderStatus(status) {
 
   platformChip.textContent = `${status.system.platform} ${status.system.arch}`;
   setChipTone(platformChip, "neutral");
+  document.title = status.manager.title;
+  appTitle.textContent = status.manager.title;
+  appSubtitle.textContent = status.manager.subtitle;
+  logoutButton.hidden = !status.manager.authEnabled;
   heroInstallState.textContent = boolLabel(status.openclaw.installed, "已安装", "未安装");
   heroInstallDetail.textContent = !status.openclaw.installed
     ? "点击上方安装按钮开始部署。"
@@ -385,6 +396,10 @@ function renderStatus(status) {
 
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
+  if (response.status === 401) {
+    window.location.replace("/login");
+    throw new Error("请先登录。");
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || `Request failed: ${response.status}`);
@@ -540,6 +555,22 @@ reloadOnboardButton.addEventListener("click", async () => {
     printConsole("初始化向导默认值已刷新", {});
   } catch (error) {
     printConsole("加载向导默认值失败", { stderr: error.message });
+  } finally {
+    state.busy = false;
+    applyBusyState();
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  state.busy = true;
+  applyBusyState();
+  try {
+    await fetchJson("/api/logout", {
+      method: "POST",
+    });
+    window.location.replace("/login");
+  } catch (error) {
+    printConsole("退出登录失败", { stderr: error.message });
   } finally {
     state.busy = false;
     applyBusyState();

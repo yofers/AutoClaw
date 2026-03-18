@@ -1,0 +1,9 @@
+enabled: true
+session:
+  cookie_name: "autoopenclaw_session"
+  ttl_hours: 24
+  secret: "change-this-session-secret"
+users:
+  - username: "root"
+    display_name: "Administrator"
+    password: "change-me-now"

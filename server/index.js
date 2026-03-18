@@ -2,15 +2,55 @@ const fs = require("fs");
 const http = require("http");
 const os = require("os");
 const path = require("path");
-const { randomBytes, randomUUID } = require("crypto");
+const { randomBytes, randomUUID, timingSafeEqual } = require("crypto");
 const { spawn } = require("child_process");
 
-const HOST = process.env.HOST || "127.0.0.1";
-const PORT = Number(process.env.PORT || "31870");
+const CONFIG_DIR = path.join(__dirname, "..", "config");
+const WEB_CONFIG_PATH = path.join(CONFIG_DIR, "web.yaml");
 const STATIC_DIR = path.join(__dirname, "..", "public");
+const SESSION_COOKIE_NAME = "autoclaw_session";
 const MAX_JOB_OUTPUT = 24_000;
 const MAX_JOBS = 20;
 const VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_WEB_CONFIG = `# AutoOpenClaw Web manager configuration
+# Changes to host/port require restarting the manager process.
+
+server:
+  host: "127.0.0.1"
+  port: 31870
+
+site:
+  title: "AutoOpenClaw"
+  subtitle: "本地优先、状态清晰、动作可回退的 OpenClaw 控制面板"
+
+auth:
+  enabled: true
+  username: "admin"
+  password: "change-this-password"
+  sessionTtlHours: 12
+
+security:
+  loopbackOnly: true
+`;
+const DEFAULT_WEB_SETTINGS = {
+  server: {
+    host: "127.0.0.1",
+    port: 31870,
+  },
+  site: {
+    title: "AutoOpenClaw",
+    subtitle: "本地优先、状态清晰、动作可回退的 OpenClaw 控制面板",
+  },
+  auth: {
+    enabled: true,
+    username: "admin",
+    password: "change-this-password",
+    sessionTtlHours: 12,
+  },
+  security: {
+    loopbackOnly: true,
+  },
+};
 const DEFAULT_CONFIG = `{
   gateway: {
     port: 18789,
@@ -36,12 +76,229 @@ const DEFAULT_CONFIG = `{
 
 const DEFAULT_DASHBOARD_URL = "http://127.0.0.1:18789/";
 
-function json(data, statusCode = 200) {
+function ensureWebConfigFile() {
+  if (fs.existsSync(WEB_CONFIG_PATH)) {
+    return false;
+  }
+
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(WEB_CONFIG_PATH, DEFAULT_WEB_CONFIG, "utf8");
+  return true;
+}
+
+function parseYamlScalar(value) {
+  const text = String(value || "").trim();
+  if (!text.length) return "";
+
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    const inner = text.slice(1, -1);
+    if (text.startsWith('"')) {
+      return inner
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, "\\");
+    }
+    return inner.replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+  }
+
+  if (text === "true") return true;
+  if (text === "false") return false;
+  if (text === "null") return null;
+  if (/^-?\d+(?:\.\d+)?$/.test(text)) {
+    return Number(text);
+  }
+
+  return text;
+}
+
+function parseSimpleYaml(raw) {
+  const root = {};
+  const stack = [{ indent: -2, value: root }];
+  const lines = String(raw || "").split(/\r?\n/);
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      return;
+    }
+
+    const indent = line.match(/^ */)[0].length;
+    if (indent % 2 !== 0) {
+      throw new Error(`web.yaml 第 ${index + 1} 行缩进必须使用 2 个空格。`);
+    }
+
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+
+    const parent = stack[stack.length - 1];
+    if (indent > parent.indent + 2) {
+      throw new Error(`web.yaml 第 ${index + 1} 行缩进层级不合法。`);
+    }
+
+    const content = line.slice(indent);
+    const separatorIndex = content.indexOf(":");
+    if (separatorIndex < 1) {
+      throw new Error(`web.yaml 第 ${index + 1} 行格式不正确。`);
+    }
+
+    const key = content.slice(0, separatorIndex).trim();
+    const remainder = content.slice(separatorIndex + 1).trim();
+
+    if (!remainder) {
+      const child = {};
+      parent.value[key] = child;
+      stack.push({ indent, value: child });
+      return;
+    }
+
+    parent.value[key] = parseYamlScalar(remainder);
+  });
+
+  return root;
+}
+
+function validatePositiveInteger(value, label, min = 1, max = Number.MAX_SAFE_INTEGER) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw new Error(`${label}必须是 ${min}-${max} 之间的整数。`);
+  }
+  return number;
+}
+
+function validatePort(value, label = "Gateway 端口") {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${label}必须是 1-65535 之间的整数。`);
+  }
+  return port;
+}
+
+function normalizeWebConfig(rawConfig = {}) {
+  const server = rawConfig.server || {};
+  const site = rawConfig.site || {};
+  const auth = rawConfig.auth || {};
+  const security = rawConfig.security || {};
+
+  const host = String(server.host ?? DEFAULT_WEB_SETTINGS.server.host).trim();
+  const title = String(site.title ?? DEFAULT_WEB_SETTINGS.site.title).trim();
+  const subtitle = String(site.subtitle ?? DEFAULT_WEB_SETTINGS.site.subtitle).trim();
+  const username = String(auth.username ?? DEFAULT_WEB_SETTINGS.auth.username).trim();
+  const password = String(auth.password ?? DEFAULT_WEB_SETTINGS.auth.password);
+
+  if (!host) {
+    throw new Error("Web 服务 host 不能为空。");
+  }
+
+  if (!title) {
+    throw new Error("站点标题不能为空。");
+  }
+
+  if (!subtitle) {
+    throw new Error("站点副标题不能为空。");
+  }
+
+  const enabled =
+    typeof auth.enabled === "boolean" ? auth.enabled : DEFAULT_WEB_SETTINGS.auth.enabled;
+
+  if (enabled && !username) {
+    throw new Error("启用登录后，用户名不能为空。");
+  }
+
+  if (enabled && !password.trim()) {
+    throw new Error("启用登录后，密码不能为空。");
+  }
+
+  return {
+    server: {
+      host,
+      port: validatePort(server.port ?? DEFAULT_WEB_SETTINGS.server.port, "Web 页面端口"),
+    },
+    site: {
+      title,
+      subtitle,
+    },
+    auth: {
+      enabled,
+      username,
+      password,
+      sessionTtlHours: validatePositiveInteger(
+        auth.sessionTtlHours ?? DEFAULT_WEB_SETTINGS.auth.sessionTtlHours,
+        "登录会话时长",
+        1,
+        168
+      ),
+    },
+    security: {
+      loopbackOnly:
+        typeof security.loopbackOnly === "boolean"
+          ? security.loopbackOnly
+          : DEFAULT_WEB_SETTINGS.security.loopbackOnly,
+    },
+  };
+}
+
+function loadWebConfig() {
+  ensureWebConfigFile();
+  const raw = fs.readFileSync(WEB_CONFIG_PATH, "utf8");
+  const parsed = parseSimpleYaml(raw);
+  return normalizeWebConfig(parsed);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderHtmlTemplate(raw) {
+  return String(raw)
+    .replaceAll("{{APP_TITLE}}", escapeHtml(WEB_CONFIG.site.title))
+    .replaceAll("{{APP_SUBTITLE}}", escapeHtml(WEB_CONFIG.site.subtitle));
+}
+
+function parseCookies(header) {
+  return String(header || "")
+    .split(/;\s*/)
+    .filter(Boolean)
+    .reduce((cookies, entry) => {
+      const separatorIndex = entry.indexOf("=");
+      if (separatorIndex < 0) {
+        return cookies;
+      }
+      const key = entry.slice(0, separatorIndex).trim();
+      const value = entry.slice(separatorIndex + 1).trim();
+      cookies[key] = decodeURIComponent(value);
+      return cookies;
+    }, {});
+}
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+const WEB_CONFIG = loadWebConfig();
+const HOST = process.env.HOST || WEB_CONFIG.server.host;
+const PORT = Number(process.env.PORT || WEB_CONFIG.server.port);
+
+function json(data, statusCode = 200, extraHeaders = {}) {
   return {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
+      ...extraHeaders,
     },
     body: JSON.stringify(data),
   };
@@ -50,6 +307,14 @@ function json(data, statusCode = 200) {
 function send(res, payload) {
   res.writeHead(payload.statusCode, payload.headers);
   res.end(payload.body);
+}
+
+function redirect(res, location) {
+  res.writeHead(302, {
+    Location: location,
+    "Cache-Control": "no-store",
+  });
+  res.end();
 }
 
 function escapeShell(value) {
@@ -137,7 +402,105 @@ function runCommand(command, options = {}) {
 }
 
 const actionJobs = new Map();
+const sessions = new Map();
 let latestVersionCache = null;
+
+function sessionTtlMs() {
+  return WEB_CONFIG.auth.sessionTtlHours * 60 * 60 * 1000;
+}
+
+function setSessionCookie(token) {
+  return [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${Math.floor(sessionTtlMs() / 1000)}`,
+  ].join("; ");
+}
+
+function clearSessionCookie() {
+  return [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+    "Max-Age=0",
+  ].join("; ");
+}
+
+function pruneSessions() {
+  const now = Date.now();
+  sessions.forEach((session, token) => {
+    if (!session || session.expiresAt <= now) {
+      sessions.delete(token);
+    }
+  });
+}
+
+function getSession(req) {
+  if (!WEB_CONFIG.auth.enabled) {
+    return {
+      username: WEB_CONFIG.auth.username,
+      expiresAt: Number.MAX_SAFE_INTEGER,
+    };
+  }
+
+  pruneSessions();
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (!token) {
+    return null;
+  }
+
+  const session = sessions.get(token);
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+
+  return session;
+}
+
+function isAuthenticated(req) {
+  return Boolean(getSession(req));
+}
+
+function createSession(username) {
+  pruneSessions();
+  const token = randomBytes(32).toString("hex");
+  const session = {
+    username,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + sessionTtlMs(),
+  };
+  sessions.set(token, session);
+  return { token, session };
+}
+
+function destroySession(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (token) {
+    sessions.delete(token);
+  }
+}
+
+function publicSessionData(req) {
+  return {
+    authenticated: isAuthenticated(req),
+    authEnabled: WEB_CONFIG.auth.enabled,
+    appTitle: WEB_CONFIG.site.title,
+    appSubtitle: WEB_CONFIG.site.subtitle,
+    configPath: WEB_CONFIG_PATH,
+    sessionTtlHours: WEB_CONFIG.auth.sessionTtlHours,
+    loopbackOnly: WEB_CONFIG.security.loopbackOnly,
+  };
+}
 
 function trimJobBuffer(value) {
   if (!value) return "";
@@ -203,14 +566,6 @@ function boolFromBody(value, fallback = false) {
 
 function stringOrEmpty(value) {
   return String(value || "").trim();
-}
-
-function validatePort(value) {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("Gateway 端口必须是 1-65535 之间的整数。");
-  }
-  return port;
 }
 
 function pushFlag(args, name, value) {
@@ -476,9 +831,15 @@ async function getStatus() {
 
   return {
     manager: {
+      title: WEB_CONFIG.site.title,
+      subtitle: WEB_CONFIG.site.subtitle,
       host: HOST,
       port: PORT,
       url: `http://${HOST}:${PORT}/`,
+      configPath: WEB_CONFIG_PATH,
+      authEnabled: WEB_CONFIG.auth.enabled,
+      sessionTtlHours: WEB_CONFIG.auth.sessionTtlHours,
+      loopbackOnly: WEB_CONFIG.security.loopbackOnly,
     },
     system: {
       platform: process.platform,
@@ -827,6 +1188,26 @@ function ensureLoopback(req) {
   );
 }
 
+function ensureAllowedClient(req) {
+  return !WEB_CONFIG.security.loopbackOnly || ensureLoopback(req);
+}
+
+function normalizePathname(pathname) {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+}
+
+function loginRedirectLocation(pathname) {
+  const next = pathname && pathname !== "/" ? `?next=${encodeURIComponent(pathname)}` : "";
+  return `/login${next}`;
+}
+
+function resolveStaticPath(pathname) {
+  const normalizedPathname = normalizePathname(pathname);
+  if (normalizedPathname === "/") return "/index.html";
+  if (normalizedPathname === "/login") return "/login.html";
+  return normalizedPathname;
+}
+
 function backupName(filePath) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   return `${filePath}.bak-${stamp}`;
@@ -840,11 +1221,76 @@ function contentType(filePath) {
 }
 
 async function handleApi(req, res, pathname) {
-  const normalizedPathname =
-    pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  const normalizedPathname = normalizePathname(pathname);
 
-  if (!ensureLoopback(req)) {
+  if (!ensureAllowedClient(req)) {
     send(res, json({ error: "Loopback only." }, 403));
+    return;
+  }
+
+  if (req.method === "GET" && normalizedPathname === "/api/session") {
+    send(res, json(publicSessionData(req)));
+    return;
+  }
+
+  if (req.method === "POST" && normalizedPathname === "/api/login") {
+    if (!WEB_CONFIG.auth.enabled) {
+      send(res, json({ ok: true, ...publicSessionData(req) }));
+      return;
+    }
+
+    const raw = await readBody(req);
+    const body = raw ? JSON.parse(raw) : {};
+    const username = stringOrEmpty(body.username);
+    const password = String(body.password || "");
+
+    if (
+      !safeEqual(username, WEB_CONFIG.auth.username) ||
+      !safeEqual(password, WEB_CONFIG.auth.password)
+    ) {
+      send(res, json({ error: "用户名或密码错误。" }, 401));
+      return;
+    }
+
+    const { token } = createSession(username);
+    send(
+      res,
+      json(
+        {
+          ok: true,
+          ...publicSessionData(req),
+          authenticated: true,
+        },
+        200,
+        {
+          "Set-Cookie": setSessionCookie(token),
+        }
+      )
+    );
+    return;
+  }
+
+  if (req.method === "POST" && normalizedPathname === "/api/logout") {
+    destroySession(req);
+    send(
+      res,
+      json(
+        {
+          ok: true,
+          ...publicSessionData(req),
+          authenticated: false,
+        },
+        200,
+        {
+          "Set-Cookie": clearSessionCookie(),
+        }
+      )
+    );
+    return;
+  }
+
+  if (WEB_CONFIG.auth.enabled && !isAuthenticated(req)) {
+    send(res, json({ error: "请先登录。", loginUrl: "/login" }, 401));
     return;
   }
 
@@ -935,7 +1381,7 @@ async function handleApi(req, res, pathname) {
 }
 
 function serveStatic(res, pathname) {
-  const cleanPath = pathname === "/" ? "/index.html" : pathname;
+  const cleanPath = resolveStaticPath(pathname);
   const filePath = path.join(STATIC_DIR, cleanPath);
   if (!filePath.startsWith(STATIC_DIR) || !fs.existsSync(filePath)) {
     send(
@@ -948,17 +1394,51 @@ function serveStatic(res, pathname) {
     "Content-Type": contentType(filePath),
     "Cache-Control": "no-store",
   });
+  if (filePath.endsWith(".html")) {
+    res.end(renderHtmlTemplate(fs.readFileSync(filePath, "utf8")));
+    return;
+  }
   res.end(fs.readFileSync(filePath));
 }
 
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    if (url.pathname.startsWith("/api/")) {
-      await handleApi(req, res, url.pathname);
+    const normalizedPathname = normalizePathname(url.pathname);
+
+    if (normalizedPathname.startsWith("/api/")) {
+      await handleApi(req, res, normalizedPathname);
       return;
     }
-    serveStatic(res, url.pathname);
+
+    if (!ensureAllowedClient(req)) {
+      send(res, json({ error: "Loopback only." }, 403));
+      return;
+    }
+
+    const authenticated = isAuthenticated(req);
+    const isLoginPage =
+      normalizedPathname === "/login" || normalizedPathname === "/login.html";
+
+    if (isLoginPage) {
+      if (!WEB_CONFIG.auth.enabled || authenticated) {
+        redirect(res, "/");
+        return;
+      }
+      serveStatic(res, normalizedPathname);
+      return;
+    }
+
+    if (
+      WEB_CONFIG.auth.enabled &&
+      !authenticated &&
+      (normalizedPathname === "/" || normalizedPathname.endsWith(".html"))
+    ) {
+      redirect(res, loginRedirectLocation(`${normalizedPathname}${url.search || ""}`));
+      return;
+    }
+
+    serveStatic(res, normalizedPathname);
   } catch (error) {
     send(
       res,

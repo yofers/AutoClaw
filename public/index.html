@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AutoOpenClaw</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <title>{{APP_TITLE}}</title>
+    <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="masthead">
         <div class="masthead-copy">
           <p class="eyebrow">LOCAL CONTROL PANEL</p>
-          <h1>AutoOpenClaw</h1>
+          <h1 id="app-title">{{APP_TITLE}}</h1>
           <p class="hero-copy">
             面向本机运维的 OpenClaw 控制面板。把安装、初始化、Gateway 状态和
             <code>~/.openclaw/openclaw.json</code> 维护放在同一个工作面板里。
           </p>
-          <p class="masthead-note">本地优先、状态清晰、动作可回退，不假设远程托管场景。</p>
+          <p class="masthead-note" id="app-subtitle">{{APP_SUBTITLE}}</p>
           <div class="masthead-summary">
             <article class="summary-card" id="install-summary-card">
               <span class="summary-label">OpenClaw</span>
@@ -47,6 +47,7 @@
             rel="noreferrer"
             >打开 Dashboard</a
           >
+          <button class="ghost" id="logout-button" hidden>退出登录</button>
           <button class="danger" data-action="uninstall">卸载 OpenClaw</button>
         </div>
       </header>
@@ -369,6 +370,6 @@
       </section>
     </main>
 
-    <script src="/app.js"></script>
+    <script src="/js/app.js"></script>
   </body>
 </html>

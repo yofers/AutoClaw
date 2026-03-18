@@ -1,0 +1,19 @@
+# AutoOpenClaw Web manager configuration
+# Changes to host/port require restarting the manager process.
+
+server:
+  host: "127.0.0.1"
+  port: 31870
+
+site:
+  title: "AutoOpenClaw"
+  subtitle: "本地优先、状态清晰、动作可回退的 OpenClaw 控制面板"
+
+auth:
+  enabled: true
+  username: "root"
+  password: "change-this-password"
+  sessionTtlHours: 12
+
+security:
+  loopbackOnly: true
