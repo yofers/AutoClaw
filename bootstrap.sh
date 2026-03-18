@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || pwd)"
-ROOT_DIR="${AUTOOPENCLAW_ROOT_DIR:-${SCRIPT_ROOT}}"
+LAUNCH_DIR="$(pwd -P)"
+ROOT_DIR="${AUTOOPENCLAW_ROOT_DIR:-${LAUNCH_DIR}}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-31870}"
 DEFAULT_REMOTE_REPO="yofers/AutoClaw"
@@ -160,17 +160,54 @@ open_browser() {
   fi
 }
 
-download_repo_archive() {
+is_project_dir() {
+  local dir="$1"
+  [[ -f "${dir}/server/index.js" && -f "${dir}/public/index.html" ]]
+}
+
+can_populate_dir() {
+  local dir="$1"
+  local entry
+
+  mkdir -p "${dir}"
+
+  while IFS= read -r entry; do
+    case "${entry##*/}" in
+      bootstrap.sh|bootstrap.ps1|.DS_Store|Thumbs.db)
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done < <(find "${dir}" -mindepth 1 -maxdepth 1 -print)
+
+  return 0
+}
+
+copy_repo_to_dir() {
+  local source_dir="$1"
+  local target_dir="$2"
+
+  mkdir -p "${target_dir}"
+  cp -R "${source_dir}/." "${target_dir}/"
+}
+
+download_repo_archive_to_dir() {
   local repo="$1"
   local ref="$2"
-  local cache_dir="${CACHE_ROOT}/${repo//\//-}-${ref//\//-}"
-  local archive_path="${cache_dir}.tar.gz"
-  local extract_root="${cache_dir}.extract"
+  local target_dir="$3"
+  local work_dir
+  local archive_path
+  local extract_root
   local archive_url="https://github.com/${repo}/archive/${ref}.tar.gz"
 
-  rm -rf "${cache_dir}" "${extract_root}" "${archive_path}"
+  mkdir -p "${CACHE_ROOT}"
+  work_dir="$(mktemp -d "${CACHE_ROOT}/archive-XXXXXX")"
+  archive_path="${work_dir}/repo.tar.gz"
+  extract_root="${work_dir}/extract"
+
   mkdir -p "${extract_root}"
-  log "从 GitHub 下载 AutoOpenClaw 仓库归档: ${repo}@${ref}"
+  log "从 GitHub 下载 AutoOpenClaw 仓库到 ${target_dir}: ${repo}@${ref}"
   curl -fsSL "${archive_url}" -o "${archive_path}"
   tar -xzf "${archive_path}" -C "${extract_root}"
 
@@ -181,45 +218,57 @@ download_repo_archive() {
     exit 1
   fi
 
-  mv "${extracted_dir}" "${cache_dir}"
-  rm -rf "${extract_root}" "${archive_path}"
-  printf '%s\n' "${cache_dir}"
+  copy_repo_to_dir "${extracted_dir}" "${target_dir}"
+  rm -rf "${work_dir}"
 }
 
-clone_repo() {
+clone_repo_to_dir() {
   local repo="$1"
   local ref="$2"
-  local cache_dir="${CACHE_ROOT}/${repo//\//-}-${ref//\//-}"
+  local target_dir="$3"
+  local work_dir
 
-  rm -rf "${cache_dir}"
   mkdir -p "${CACHE_ROOT}"
-  log "从 GitHub 克隆 AutoOpenClaw 仓库: ${repo}@${ref}"
-  git clone --depth 1 --branch "${ref}" "https://github.com/${repo}.git" "${cache_dir}" >/dev/null 2>&1
-  printf '%s\n' "${cache_dir}"
+  work_dir="$(mktemp -d "${CACHE_ROOT}/clone-XXXXXX")"
+  rm -rf "${work_dir}"
+
+  log "从 GitHub 克隆 AutoOpenClaw 仓库到 ${target_dir}: ${repo}@${ref}"
+  git clone --depth 1 --branch "${ref}" "https://github.com/${repo}.git" "${work_dir}" >/dev/null 2>&1
+  copy_repo_to_dir "${work_dir}" "${target_dir}"
+  rm -rf "${work_dir}"
 }
 
 resolve_root_dir() {
-  if [[ -f "${ROOT_DIR}/server/index.js" && -f "${ROOT_DIR}/public/index.html" ]]; then
+  if is_project_dir "${ROOT_DIR}"; then
     printf '%s\n' "${ROOT_DIR}"
     return 0
   fi
 
   if [[ -z "${AUTOOPENCLAW_REPO:-}" ]]; then
-    log "当前不是本地仓库运行，未显式设置 AUTOOPENCLAW_REPO，默认回退到 ${DEFAULT_REMOTE_REPO}@${REMOTE_REF}。"
+    log "当前目录不是完整项目，未显式设置 AUTOOPENCLAW_REPO，默认回退到 ${DEFAULT_REMOTE_REPO}@${REMOTE_REF}。"
+  fi
+
+  if ! can_populate_dir "${ROOT_DIR}"; then
+    log "目标目录 ${ROOT_DIR} 不是空目录，且不是 AutoOpenClaw 项目目录；为避免覆盖现有文件，已停止。"
+    log "请在空目录中执行脚本，或显式设置 AUTOOPENCLAW_ROOT_DIR 指向目标目录。"
+    exit 1
   fi
 
   if have git; then
-    clone_repo "${REMOTE_REPO}" "${REMOTE_REF}"
-    return 0
+    clone_repo_to_dir "${REMOTE_REPO}" "${REMOTE_REF}" "${ROOT_DIR}"
+  elif have tar; then
+    download_repo_archive_to_dir "${REMOTE_REPO}" "${REMOTE_REF}" "${ROOT_DIR}"
+  else
+    log "缺少 git 或 tar，无法从 GitHub 拉取项目。"
+    exit 1
   fi
 
-  if have tar; then
-    download_repo_archive "${REMOTE_REPO}" "${REMOTE_REF}"
-    return 0
+  if ! is_project_dir "${ROOT_DIR}"; then
+    log "项目文件拉取完成，但目录结构不完整，请检查仓库内容。"
+    exit 1
   fi
 
-  log "缺少 git 或 tar，无法从 GitHub 拉取项目。"
-  exit 1
+  printf '%s\n' "${ROOT_DIR}"
 }
 
 main() {

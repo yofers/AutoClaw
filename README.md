@@ -64,9 +64,11 @@ irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/bootstrap.ps
 
 脚本会优先这样处理：
 
-1. 如果当前目录就是完整项目，直接使用本地项目文件。
-2. 如果不是本地项目，会默认从 `yofers/AutoClaw` 拉取；显式设置了 `AUTOOPENCLAW_REPO` 时，则优先使用你指定的仓库。
-3. 如果本地已安装 `openclaw`，网页内的运维、初始化和更新动作会直接复用该 `openclaw`。
+1. 默认把“当前执行命令时所在目录”作为项目目录；显式设置 `AUTOOPENCLAW_ROOT_DIR` 时，以该目录为准。
+2. 如果目标目录已经是完整项目，直接使用本地项目文件。
+3. 如果目标目录不是项目目录，会默认从 `yofers/AutoClaw` 拉取到该目录；显式设置了 `AUTOOPENCLAW_REPO` 时，则优先使用你指定的仓库。
+4. 如果目标目录非空且不是项目目录，脚本会停止，避免覆盖现有文件。
+5. 如果本地已安装 `openclaw`，网页内的运维、初始化和更新动作会直接复用该 `openclaw`。
 
 默认会启动本地管理页：
 

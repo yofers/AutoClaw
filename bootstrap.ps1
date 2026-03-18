@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RootDir = if ($env:AUTOOPENCLAW_ROOT_DIR) { $env:AUTOOPENCLAW_ROOT_DIR } else { $ScriptRoot }
+$LaunchDir = (Get-Location).Path
+$RootDir = if ($env:AUTOOPENCLAW_ROOT_DIR) { $env:AUTOOPENCLAW_ROOT_DIR } else { $LaunchDir }
 $HostIp = if ($env:HOST) { $env:HOST } else { "127.0.0.1" }
 $Port = if ($env:PORT) { $env:PORT } else { "31870" }
 $DefaultRemoteRepo = "yofers/AutoClaw"
@@ -37,49 +37,88 @@ function Find-OpenClaw {
   return $null
 }
 
-function Download-RepoArchive($Repo, $Ref) {
-  $target = Join-Path $CacheRoot (($Repo -replace "[/\\:]", "-") + "-" + ($Ref -replace "[/\\:]", "-"))
-  $zipPath = "$target.zip"
-  $extractRoot = "$target.extract"
+function Test-ProjectRoot($Dir) {
+  return (Test-Path (Join-Path $Dir "server\index.js")) -and (Test-Path (Join-Path $Dir "public\index.html"))
+}
+
+function Test-CanPopulateDir($Dir) {
+  if (-not (Test-Path $Dir)) {
+    New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+    return $true
+  }
+
+  $allowed = @("bootstrap.sh", "bootstrap.ps1", ".DS_Store", "Thumbs.db")
+  $entries = Get-ChildItem -Force $Dir
+  foreach ($entry in $entries) {
+    if ($allowed -notcontains $entry.Name) {
+      return $false
+    }
+  }
+
+  return $true
+}
+
+function Copy-RepoToDir($SourceDir, $TargetDir) {
+  New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+  Get-ChildItem -Force $SourceDir | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $TargetDir -Recurse -Force
+  }
+}
+
+function Download-RepoArchiveToDir($Repo, $Ref, $TargetDir) {
+  New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
+  $workDir = Join-Path $CacheRoot ([System.Guid]::NewGuid().ToString())
+  $zipPath = Join-Path $workDir "repo.zip"
+  $extractRoot = Join-Path $workDir "extract"
   $archiveUrl = "https://github.com/$Repo/archive/$Ref.zip"
 
-  Remove-Item -Recurse -Force $target, $zipPath, $extractRoot -ErrorAction SilentlyContinue
+  Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
-  Write-Log "从 GitHub 下载 AutoOpenClaw 仓库归档: $Repo@$Ref"
+  Write-Log "从 GitHub 下载 AutoOpenClaw 仓库到 ${TargetDir}: $Repo@$Ref"
   Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath
   Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
   $extracted = Get-ChildItem -Directory $extractRoot | Select-Object -First 1
   if (-not $extracted) {
     throw "GitHub 归档解压失败。"
   }
-  Move-Item -Path $extracted.FullName -Destination $target
-  Remove-Item -Recurse -Force $zipPath, $extractRoot -ErrorAction SilentlyContinue
-  return $target
+  Copy-RepoToDir $extracted.FullName $TargetDir
+  Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
 }
 
-function Clone-Repo($Repo, $Ref) {
-  $target = Join-Path $CacheRoot (($Repo -replace "[/\\:]", "-") + "-" + ($Ref -replace "[/\\:]", "-"))
-  Remove-Item -Recurse -Force $target -ErrorAction SilentlyContinue
+function Clone-RepoToDir($Repo, $Ref, $TargetDir) {
+  $workDir = Join-Path $CacheRoot ([System.Guid]::NewGuid().ToString())
+  Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
-  Write-Log "从 GitHub 克隆 AutoOpenClaw 仓库: $Repo@$Ref"
-  git clone --depth 1 --branch $Ref "https://github.com/$Repo.git" $target | Out-Null
-  return $target
+  Write-Log "从 GitHub 克隆 AutoOpenClaw 仓库到 ${TargetDir}: $Repo@$Ref"
+  git clone --depth 1 --branch $Ref "https://github.com/$Repo.git" $workDir | Out-Null
+  Copy-RepoToDir $workDir $TargetDir
+  Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
 }
 
 function Resolve-RootDir {
-  if ((Test-Path (Join-Path $RootDir "backend\index.js")) -and (Test-Path (Join-Path $RootDir "web\index.html"))) {
+  if (Test-ProjectRoot $RootDir) {
     return $RootDir
   }
 
   if (-not $env:AUTOOPENCLAW_REPO) {
-    Write-Log "当前不是本地仓库运行，未显式设置 AUTOOPENCLAW_REPO，默认回退到 $DefaultRemoteRepo@$RemoteRef。"
+    Write-Log "当前目录不是完整项目，未显式设置 AUTOOPENCLAW_REPO，默认回退到 $DefaultRemoteRepo@$RemoteRef。"
+  }
+
+  if (-not (Test-CanPopulateDir $RootDir)) {
+    throw "目标目录 $RootDir 不是空目录，且不是 AutoOpenClaw 项目目录；为避免覆盖现有文件，已停止。请在空目录中执行脚本，或显式设置 AUTOOPENCLAW_ROOT_DIR 指向目标目录。"
   }
 
   if (Test-Command "git") {
-    return Clone-Repo $RemoteRepo $RemoteRef
+    Clone-RepoToDir $RemoteRepo $RemoteRef $RootDir
+  } else {
+    Download-RepoArchiveToDir $RemoteRepo $RemoteRef $RootDir
   }
 
-  return Download-RepoArchive $RemoteRepo $RemoteRef
+  if (-not (Test-ProjectRoot $RootDir)) {
+    throw "项目文件拉取完成，但目录结构不完整，请检查仓库内容。"
+  }
+
+  return $RootDir
 }
 
 function Ensure-Node {
