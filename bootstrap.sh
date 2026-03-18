@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || pwd)"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || pwd)"
 ROOT_DIR="${AUTOOPENCLAW_ROOT_DIR:-${SCRIPT_ROOT}}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-31870}"

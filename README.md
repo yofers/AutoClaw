@@ -17,33 +17,33 @@
 ### macOS / Linux
 
 ```bash
-chmod +x scripts/bootstrap.sh
-./scripts/bootstrap.sh
+chmod +x bootstrap.sh
+./bootstrap.sh
 ```
 
 ### Windows PowerShell
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\bootstrap.ps1
+.\bootstrap.ps1
 ```
 
 ## GitHub 远程启动
 
-上传到 GitHub 后，推荐保留 `scripts/bootstrap.sh` 和 `scripts/bootstrap.ps1` 作为统一入口。
+上传到 GitHub 后，推荐把 `bootstrap.sh` 和 `bootstrap.ps1` 放在仓库根目录，作为统一入口。
 
 ### macOS / Linux
 
 官方仓库默认可直接这样启动：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yofers/AutoClaw/main/scripts/bootstrap.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/yofers/AutoClaw/main/bootstrap.sh)
 ```
 
 如果你要使用自己的 fork 或指定 tag / branch，再显式传入仓库和版本：
 
 ```bash
-AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/bootstrap.sh)
+AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/bootstrap.sh)
 ```
 
 ### Windows PowerShell
@@ -51,7 +51,7 @@ AUTOOPENCLAW_REPO=<user>/<repo> AUTOOPENCLAW_REF=<tag-or-branch> bash <(curl -fs
 官方仓库默认可直接这样启动：
 
 ```powershell
-irm https://raw.githubusercontent.com/yofers/AutoClaw/main/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/yofers/AutoClaw/main/bootstrap.ps1 | iex
 ```
 
 如果你要使用自己的 fork 或指定 tag / branch，再显式传入仓库和版本：
@@ -59,7 +59,7 @@ irm https://raw.githubusercontent.com/yofers/AutoClaw/main/scripts/bootstrap.ps1
 ```powershell
 $env:AUTOOPENCLAW_REPO = "<user>/<repo>"
 $env:AUTOOPENCLAW_REF = "<tag-or-branch>"
-irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/scripts/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/bootstrap.ps1 | iex
 ```
 
 脚本会优先这样处理：
@@ -76,8 +76,8 @@ http://127.0.0.1:31870/
 
 ## 目录
 
-- `scripts/bootstrap.sh`: macOS / Linux 一键入口
-- `scripts/bootstrap.ps1`: Windows 一键入口
+- `bootstrap.sh`: macOS / Linux 一键入口
+- `bootstrap.ps1`: Windows 一键入口
 - `server/index.js`: 轻量本地服务，负责状态探测、调用官方安装器、读写配置
 - `public/`: 本地网页
 

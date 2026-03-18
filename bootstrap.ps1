@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$ScriptRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = if ($env:AUTOOPENCLAW_ROOT_DIR) { $env:AUTOOPENCLAW_ROOT_DIR } else { $ScriptRoot }
 $HostIp = if ($env:HOST) { $env:HOST } else { "127.0.0.1" }
 $Port = if ($env:PORT) { $env:PORT } else { "31870" }
@@ -67,7 +67,7 @@ function Clone-Repo($Repo, $Ref) {
 }
 
 function Resolve-RootDir {
-  if ((Test-Path (Join-Path $RootDir "server\index.js")) -and (Test-Path (Join-Path $RootDir "public\index.html"))) {
+  if ((Test-Path (Join-Path $RootDir "backend\index.js")) -and (Test-Path (Join-Path $RootDir "web\index.html"))) {
     return $RootDir
   }
 
