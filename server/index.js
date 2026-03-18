@@ -781,6 +781,57 @@ function trimOutput(value) {
   return value.trim().slice(0, 8000);
 }
 
+function gatewayServiceInstalled(statusText) {
+  return !/Service not installed|Service unit not found/i.test(String(statusText || ""));
+}
+
+function gatewayServiceLoaded(statusText) {
+  const text = String(statusText || "");
+  return (
+    gatewayServiceInstalled(text) &&
+    !/not loaded|RPC probe:\s*failed|Runtime:\s*unknown/i.test(text)
+  );
+}
+
+function gatewayStartNeedsInstall(statusText) {
+  return /Service not installed|Service unit not found/i.test(String(statusText || ""));
+}
+
+function gatewayStartFailed(statusText) {
+  const text = String(statusText || "");
+  return (
+    gatewayStartNeedsInstall(text) ||
+    /not loaded|RPC probe:\s*failed|Runtime:\s*unknown/i.test(text)
+  );
+}
+
+function buildGatewayStartCommand(binary, gatewayStatusText) {
+  const installStep = gatewayStartNeedsInstall(gatewayStatusText)
+    ? [buildExecutableCommand(binary, ["gateway", "install"])]
+    : [];
+
+  const statusCommand = buildExecutableCommand(binary, ["gateway", "status"]);
+  const startCommand = buildExecutableCommand(binary, ["gateway", "start"]);
+
+  if (process.platform === "win32") {
+    return [
+      ...installStep,
+      startCommand,
+      `$statusOutput = ${statusCommand} 2>&1 | Out-String`,
+      "Write-Output $statusOutput",
+      "if ($statusOutput -match 'Service not installed|Service unit not found|not loaded|RPC probe:\\s*failed|Runtime:\\s*unknown') { exit 1 }",
+    ].join("; ");
+  }
+
+  return [
+    ...installStep,
+    startCommand,
+    `status_output="$(${statusCommand} 2>&1)"`,
+    'printf "%s\\n" "$status_output"',
+    `if printf "%s" "$status_output" | grep -Eiq 'Service not installed|Service unit not found|not loaded|RPC probe:[[:space:]]*failed|Runtime:[[:space:]]*unknown'; then exit 1; fi`,
+  ].join(" ; ");
+}
+
 async function getStatus() {
   const paths = getPaths();
   const binary = await resolveOpenClawBinary();
@@ -812,8 +863,8 @@ async function getStatus() {
   const installedVersion = normalizeVersion(version.stdout || version.stderr || "");
   const latestVersion = latest.version;
   const gatewayStatusText = trimOutput(gatewayStatus.stdout || gatewayStatus.stderr || "");
-  const serviceInstalled = !/Service not installed/i.test(gatewayStatusText);
-  const serviceLoaded = !/not loaded/i.test(gatewayStatusText);
+  const serviceInstalled = gatewayServiceInstalled(gatewayStatusText);
+  const serviceLoaded = gatewayServiceLoaded(gatewayStatusText);
   const dashboardUrl =
     extractFirstUrl(dashboardInfo.stdout || dashboardInfo.stderr || "") || DEFAULT_DASHBOARD_URL;
   const versionKnown = Boolean(installedVersion);
@@ -1099,15 +1150,7 @@ async function resolveManagedAction(action) {
     gatewayStatusText = trimOutput(gatewayStatus.stdout || gatewayStatus.stderr || "");
   }
 
-  const startCommand =
-    binary && /Service not installed/i.test(gatewayStatusText)
-      ? [
-          buildExecutableCommand(binary, ["gateway", "install"]),
-          buildExecutableCommand(binary, ["gateway", "start"]),
-        ].join(" ; ")
-      : binary
-        ? buildExecutableCommand(binary, ["gateway", "start"])
-        : null;
+  const startCommand = binary ? buildGatewayStartCommand(binary, gatewayStatusText) : null;
 
   const actions = {
     install: await installCommand(),

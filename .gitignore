@@ -4,3 +4,4 @@ tmp/
 .agents/
 .trae/
 .npm/*
+.autoclaw/

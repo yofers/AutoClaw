@@ -12,7 +12,7 @@ site:
 auth:
   enabled: true
   username: "root"
-  password: "change-this-password"
+  password: "root"
   sessionTtlHours: 12
 
 security:
