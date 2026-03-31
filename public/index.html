@@ -6,18 +6,123 @@
     <title>{{APP_TITLE}}</title>
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
-  <body>
+  <body class="app-body">
     <main class="app-shell">
-      <header class="masthead">
-        <div class="masthead-copy">
-          <p class="eyebrow">LOCAL CONTROL PANEL</p>
-          <h1 id="app-title">{{APP_TITLE}}</h1>
-          <p class="hero-copy">
-            面向本机运维的 OpenClaw 控制面板。把安装、初始化、Gateway 状态和
-            <code>~/.openclaw/openclaw.json</code> 维护放在同一个工作面板里。
-          </p>
-          <p class="masthead-note" id="app-subtitle">{{APP_SUBTITLE}}</p>
-          <div class="masthead-summary">
+      <header class="app-topbar">
+        <div class="topbar-brand">
+          <div class="brand-mark" aria-hidden="true">OC</div>
+          <div class="brand-copy">
+            <strong class="brand-title" id="app-title">{{APP_TITLE}}</strong>
+            <p class="brand-subtitle" id="app-subtitle">{{APP_SUBTITLE}}</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <span class="chip" id="platform-chip">加载中</span>
+          <span class="chip chip-quiet" id="last-sync-stamp">尚未同步</span>
+          <button class="ghost topbar-logout" id="logout-button" type="button" hidden>退出登录</button>
+        </div>
+      </header>
+
+      <div class="app-frame">
+        <aside class="sidebar">
+          <nav class="sidebar-nav" id="sidebar-nav" aria-label="主导航">
+            <button class="sidebar-nav-button" data-view-target="dashboard-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M3.5 4.5H9V9.5H3.5V4.5Z" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M11 4.5H16.5V7.5H11V4.5Z" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M11 9.5H16.5V15.5H11V9.5Z" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M3.5 11.5H9V15.5H3.5V11.5Z" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">仪表盘</span>
+            </button>
+            <button class="sidebar-nav-button" data-view-target="operations-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M11.5 3.5L12.1 5.1C12.22 5.41 12.51 5.63 12.85 5.68L14.59 5.94C15.34 6.05 15.64 6.97 15.09 7.5L13.83 8.73C13.58 8.98 13.47 9.34 13.54 9.68L13.86 11.39C13.99 12.14 13.2 12.7 12.53 12.34L10.97 11.49C10.66 11.32 10.28 11.32 9.97 11.49L8.41 12.34C7.74 12.7 6.95 12.14 7.08 11.39L7.4 9.68C7.47 9.34 7.36 8.98 7.11 8.73L5.85 7.5C5.3 6.97 5.6 6.05 6.35 5.94L8.09 5.68C8.43 5.63 8.72 5.41 8.84 5.1L9.44 3.5C9.7 2.81 10.68 2.81 10.94 3.5H11.5Z"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                  />
+                  <path d="M3.5 13.5H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M14 13.5H16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">运维中心</span>
+            </button>
+            <button class="sidebar-nav-button" data-view-target="channels-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M4 5.5H16V12.5H7L4 15V5.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                  <path d="M7 8.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M7 10.75H11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">频道</span>
+            </button>
+            <button class="sidebar-nav-button" data-view-target="extensions-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M8 4.5H5.5C4.95 4.5 4.5 4.95 4.5 5.5V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M12 4.5H14.5C15.05 4.5 15.5 4.95 15.5 5.5V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M8 15.5H5.5C4.95 15.5 4.5 15.05 4.5 14.5V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M12 15.5H14.5C15.05 15.5 15.5 15.05 15.5 14.5V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M10 7V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M7 10H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">扩展</span>
+            </button>
+            <button class="sidebar-nav-button" data-view-target="skills-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H15v12H6.5A1.5 1.5 0 0 0 5 17.5V5.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                  <path d="M8 7.5H12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M8 10H12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M8 12.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">技能</span>
+            </button>
+            <button class="sidebar-nav-button" data-view-target="config-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M5 4.5H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M5 10H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M5 15.5H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <circle cx="7.5" cy="4.5" r="1.5" fill="white" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="12.5" cy="10" r="1.5" fill="white" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="9.5" cy="15.5" r="1.5" fill="white" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">配置中心</span>
+            </button>
+          </nav>
+        </aside>
+
+        <section class="workbench">
+        <section class="view-panel" id="dashboard-view" data-view-panel>
+          <header class="view-header">
+            <div>
+              <h2>系统与 OpenClaw 状态</h2>
+            </div>
+            <div class="view-toolbar">
+              <button class="ghost" id="refresh-status" type="button">刷新状态</button>
+              <a
+                class="link-button"
+                id="dashboard-link"
+                href="http://127.0.0.1:18789/"
+                target="_blank"
+                rel="noreferrer"
+                >打开 Dashboard</a
+              >
+            </div>
+          </header>
+
+          <div class="hero-grid">
             <article class="summary-card" id="install-summary-card">
               <span class="summary-label">OpenClaw</span>
               <strong class="summary-value" id="hero-install-state">加载中</strong>
@@ -34,133 +139,102 @@
               <span class="summary-detail" id="hero-config-detail">等待读取配置路径</span>
             </article>
           </div>
-        </div>
 
-        <div class="masthead-actions">
-          <button class="solid" id="install-button" data-action="install">安装 OpenClaw</button>
-          <button class="ghost" id="refresh-status">刷新状态</button>
-          <a
-            class="link-button"
-            id="dashboard-link"
-            href="http://127.0.0.1:18789/"
-            target="_blank"
-            rel="noreferrer"
-            >打开 Dashboard</a
-          >
-          <button class="ghost" id="logout-button" hidden>退出登录</button>
-          <button class="danger" data-action="uninstall">卸载 OpenClaw</button>
-        </div>
-      </header>
-
-      <section class="app-grid">
-        <section class="main-column">
-          <article class="section-block status-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Overview</p>
-                <h2>环境状态</h2>
-              </div>
-              <span class="chip" id="platform-chip">加载中</span>
-            </div>
-            <p class="panel-note panel-note-soft">系统依赖、安装版本和本地路径集中显示在这里，用于快速确认当前运行环境。</p>
-            <dl class="status-list" id="status-list"></dl>
-          </article>
-
-          <article class="section-block operations-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Operations</p>
-                <h2>运维</h2>
-              </div>
-              <span class="chip">常用操作</span>
-            </div>
-            <p class="panel-note panel-note-soft">先确认 Gateway 服务状态，再执行启动、重启或诊断动作。</p>
-            <div class="gateway-overview">
-              <div class="gateway-card" id="gateway-installed-card">
-                <span class="gateway-label">Gateway 服务已安装</span>
-                <strong class="gateway-value" id="gateway-service-installed">加载中</strong>
-              </div>
-              <div class="gateway-card" id="gateway-loaded-card">
-                <span class="gateway-label">Gateway 服务已加载</span>
-                <strong class="gateway-value" id="gateway-service-loaded">加载中</strong>
-              </div>
-            </div>
-            <div class="action-grid">
-              <button class="action-tile" data-action="doctor">
-                <span class="action-title">Doctor</span>
-                <span class="action-meta">检查依赖、安装路径和本地环境。</span>
-              </button>
-              <button class="action-tile" data-action="status">
-                <span class="action-title">Gateway 状态</span>
-                <span class="action-meta">读取当前服务状态和 Gateway 输出。</span>
-              </button>
-              <button class="action-tile" data-action="start">
-                <span class="action-title">启动 Gateway</span>
-                <span class="action-meta">必要时会先补装服务，再启动中台。</span>
-              </button>
-              <button class="action-tile" data-action="restart">
-                <span class="action-title">重启 Gateway</span>
-                <span class="action-meta">用于配置调整后的快速重载。</span>
-              </button>
-              <button class="action-tile" data-action="stop">
-                <span class="action-title">停止 Gateway</span>
-                <span class="action-meta">停止本地中台，保留安装与配置。</span>
-              </button>
-              <button class="action-tile" data-action="dashboard">
-                <span class="action-title">打印 Dashboard 链接</span>
-                <span class="action-meta">确认当前可访问的本地入口地址。</span>
-              </button>
-            </div>
-            <p class="panel-note panel-note-soft">
-              安装动作默认调用 OpenClaw 官方安装器。macOS / Linux 使用本地前缀安装，
-              Windows 调官方 PowerShell 脚本。启动 Gateway 时，如果服务缺失，会先尝试安装服务。
-            </p>
-          </article>
-
-          <article class="section-block wizard-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Onboarding</p>
-                <h2>初始化向导</h2>
-              </div>
-              <span class="chip" id="wizard-chip">准备中</span>
-            </div>
-            <p class="panel-note panel-note-soft">
-              这里调用 <code>openclaw onboard --non-interactive</code> 完成最常用的本地初始化，
-              优先让 Gateway 和 Dashboard 可用，而不是把交互式 CLI 直接塞进浏览器。
-            </p>
-            <div class="onboard-strip">
-              <div class="onboard-step">
-                <span class="onboard-index">1</span>
+          <div class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-head">
                 <div>
-                  <strong>选择 Provider</strong>
-                  <p>不接模型时可跳过，先把本地中台跑起来。</p>
+                  <h3>系统与服务环境</h3>
                 </div>
               </div>
-              <div class="onboard-step">
-                <span class="onboard-index">2</span>
-                <div>
-                  <strong>确认 Gateway</strong>
-                  <p>绑定方式、端口和认证模式都可以保留默认。</p>
-                </div>
-              </div>
-              <div class="onboard-step">
-                <span class="onboard-index">3</span>
-                <div>
-                  <strong>运行初始化</strong>
-                  <p>接受风险说明后，直接生成本地可用配置。</p>
-                </div>
-              </div>
-            </div>
+              <dl class="status-list status-list-wide" id="status-list"></dl>
+            </article>
 
-            <form id="onboard-form" class="wizard-form">
-              <section class="form-section">
-                <div class="form-section-head">
-                  <div>
-                    <h3>Provider 与工作区</h3>
-                    <p>首次接入时只需要决定是否配置模型，以及 workspace 放在哪里。</p>
-                  </div>
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Gateway 摘要</h3>
                 </div>
+              </div>
+              <div class="gateway-overview">
+                <div class="gateway-card" id="gateway-installed-card">
+                  <span class="gateway-label">Gateway 服务已安装</span>
+                  <strong class="gateway-value" id="gateway-service-installed">加载中</strong>
+                </div>
+                <div class="gateway-card" id="gateway-loaded-card">
+                  <span class="gateway-label">Gateway 服务已加载</span>
+                  <strong class="gateway-value" id="gateway-service-loaded">加载中</strong>
+                </div>
+              </div>
+              <div class="stack-list compact-stack">
+                <div class="stack-item">
+                  <strong>推荐动作</strong>
+                  <p>Gateway 未加载就去运维中心，配置未建好就去配置中心。</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view-panel" id="operations-view" data-view-panel hidden>
+          <header class="view-header">
+            <div>
+              <h2>运维中心</h2>
+            </div>
+            <div class="view-toolbar">
+              <button class="solid" id="install-button" data-action="install">安装 OpenClaw</button>
+              <button class="danger" data-action="uninstall">卸载 OpenClaw</button>
+            </div>
+          </header>
+
+          <div class="operations-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Gateway 与本地运维</h3>
+                </div>
+              </div>
+
+              <div class="action-grid">
+                <button class="action-tile" data-action="doctor">
+                  <span class="action-title">Doctor</span>
+                  <span class="action-meta">检查依赖、安装路径和本地环境。</span>
+                </button>
+                <button class="action-tile" data-action="status">
+                  <span class="action-title">Gateway 状态</span>
+                  <span class="action-meta">读取当前服务状态和 Gateway 输出。</span>
+                </button>
+                <button class="action-tile" data-action="start">
+                  <span class="action-title">启动 Gateway</span>
+                  <span class="action-meta">必要时会先补装服务，再启动中台。</span>
+                </button>
+                <button class="action-tile" data-action="restart">
+                  <span class="action-title">重启 Gateway</span>
+                  <span class="action-meta">配置变更后的快速重载入口。</span>
+                </button>
+                <button class="action-tile" data-action="stop">
+                  <span class="action-title">停止 Gateway</span>
+                  <span class="action-meta">停止本地中台，保留安装与配置。</span>
+                </button>
+                <button class="action-tile" data-action="dashboard">
+                  <span class="action-title">打印 Dashboard 链接</span>
+                  <span class="action-meta">确认当前可访问的本地入口地址。</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>初始化向导</h3>
+                </div>
+                <span class="chip" id="wizard-chip">准备中</span>
+              </div>
+              <p class="panel-note panel-note-soft">
+                这里处理本地初始化；频道配置放在配置中心。
+              </p>
+
+              <form id="onboard-form" class="wizard-form">
                 <div class="wizard-grid">
                   <label class="field">
                     <span>模型认证</span>
@@ -184,7 +258,7 @@
                     />
                   </label>
 
-                  <label class="field field-span-2">
+                  <label class="field">
                     <span>Workspace</span>
                     <input
                       id="workspace-input"
@@ -193,17 +267,7 @@
                       placeholder="留空时使用默认值 ~/.openclaw/workspace"
                     />
                   </label>
-                </div>
-              </section>
 
-              <section class="form-section">
-                <div class="form-section-head">
-                  <div>
-                    <h3>Gateway</h3>
-                    <p>绑定、端口和认证模式都支持默认值；token 留空时会自动生成。</p>
-                  </div>
-                </div>
-                <div class="wizard-grid">
                   <label class="field">
                     <span>Gateway 绑定</span>
                     <select id="gateway-bind" name="gatewayBind">
@@ -246,7 +310,7 @@
                     />
                   </label>
 
-                  <label class="field field-span-2" id="gateway-password-field">
+                  <label class="field" id="gateway-password-field">
                     <span>Gateway Password</span>
                     <input
                       id="gateway-password"
@@ -257,15 +321,7 @@
                     />
                   </label>
                 </div>
-              </section>
 
-              <section class="form-section form-section-compact">
-                <div class="form-section-head">
-                  <div>
-                    <h3>风险与托管</h3>
-                    <p>未填写的默认字段会回退到系统默认值；运行前仍需确认风险说明。</p>
-                  </div>
-                </div>
                 <div class="inline-options">
                   <label class="switch-row">
                     <input id="install-daemon" name="installDaemon" type="checkbox" checked />
@@ -276,100 +332,810 @@
                     <span>我理解 agent 具备本机执行能力，并接受对应风险</span>
                   </label>
                 </div>
-              </section>
 
-              <div class="toolbar">
-                <button class="solid" id="run-onboard" type="submit">运行初始化向导</button>
-                <button class="ghost" id="reload-onboard" type="button">重载默认值</button>
-              </div>
-            </form>
-          </article>
+                <div class="toolbar">
+                  <button class="solid" id="run-onboard" type="submit">运行初始化向导</button>
+                  <button class="ghost" id="reload-onboard" type="button">重载默认值</button>
+                </div>
+              </form>
+            </article>
+          </div>
 
-          <article class="section-block console-block">
-            <div class="section-head">
+          <article class="panel runtime-panel">
+            <div class="panel-head">
               <div>
-                <p class="section-kicker">Runtime</p>
-                <h2>执行输出</h2>
+                <h3>执行输出</h3>
               </div>
-              <span class="chip">运行日志</span>
             </div>
             <pre id="console-output">等待操作…</pre>
           </article>
         </section>
 
-        <aside class="side-column">
-          <article class="section-block editor-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Config</p>
-                <h2>配置编辑器</h2>
-              </div>
-              <span class="chip" id="config-path">读取中</span>
+        <section class="view-panel" id="channels-view" data-view-panel hidden>
+          <header class="view-header">
+            <div>
+              <h2>频道</h2>
             </div>
-            <p class="panel-note panel-note-soft">保存后，如果 Gateway 正在运行，大多数配置会自动热重载。</p>
-            <textarea id="config-editor" spellcheck="false"></textarea>
-            <div class="toolbar toolbar-compact">
-              <button class="solid" id="save-config">保存配置</button>
-              <button class="ghost" id="reload-config">重新读取</button>
+            <div class="view-toolbar">
+              <button class="solid" id="add-channel" type="button">添加频道</button>
             </div>
-          </article>
+          </header>
 
-          <article class="section-block section-block-muted preset-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Templates</p>
-                <h2>配置模板</h2>
+          <div class="channels-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>已有频道</h3>
+                </div>
               </div>
-              <span class="chip">JSON5</span>
-            </div>
-            <div class="preset-list">
-              <button class="preset" data-preset="minimal" data-label="最小本地配置">
-                <span class="preset-title">最小本地配置</span>
-                <span class="preset-meta">只保留本地 Gateway 与默认 workspace。</span>
-              </button>
-              <button class="preset" data-preset="lan" data-label="局域网访问模板">
-                <span class="preset-title">局域网访问模板</span>
-                <span class="preset-meta">把 Gateway 暴露到局域网，并保留 token 认证。</span>
-              </button>
-              <button class="preset" data-preset="multiAgent" data-label="多 Agent 模板">
-                <span class="preset-title">多 Agent 模板</span>
-                <span class="preset-meta">预置多个 workspace 与 channel 绑定示例。</span>
-              </button>
-              <button class="preset" data-preset="whitelist" data-label="WhatsApp 白名单模板">
-                <span class="preset-title">WhatsApp 白名单模板</span>
-                <span class="preset-meta">限制来源号码，并为群聊开启 mention 约束。</span>
-              </button>
-            </div>
-          </article>
+              <div class="channel-summary-list" id="channel-summary-list"></div>
+            </article>
 
-          <article class="section-block section-block-muted notes-block">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Workflow</p>
-                <h2>首次使用</h2>
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>添加方式</h3>
+                  <p class="panel-note">
+                    点击右上角“添加频道”后，在弹出框里选择频道类型并填写配置，确认后会直接保存。
+                  </p>
+                </div>
               </div>
-              <span class="chip">快速上手</span>
+              <div class="empty-note">
+                新增和编辑都通过弹出框完成。现有频道会显示在左侧列表中，点“编辑”可重新打开配置。
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <div class="modal-shell" id="channel-modal" hidden>
+          <div class="modal-backdrop" data-channel-modal-close></div>
+          <section class="modal-panel" id="channel-modal-panel" aria-modal="true" role="dialog">
+            <form class="modal-form" id="channel-modal-form">
+              <header class="modal-head">
+                <div>
+                  <h3 id="channel-modal-title">添加频道</h3>
+                  <p class="panel-note" id="channel-modal-hint">先选择频道类型，再填写配置。</p>
+                </div>
+                <button class="ghost" id="channel-modal-cancel" type="button">取消</button>
+              </header>
+
+              <label class="field">
+                <span>频道类型</span>
+                <select class="select-field" id="channel-modal-type">
+                  <option value="telegram">Telegram</option>
+                  <option value="feishu">飞书</option>
+                  <option value="slack">Slack</option>
+                  <option value="discord">Discord</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="signal">Signal</option>
+                </select>
+              </label>
+
+              <div class="channel-form-stack">
+                <section class="channel-block" id="telegram-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>Telegram</h3>
+                      <p class="panel-note">Bot Token、allowFrom 与群组触发规则。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field field-span-2">
+                      <span>Bot Token</span>
+                      <input id="telegram-bot-token" data-channel-draft-key="botToken" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="telegram-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>群组策略</span>
+                      <select id="telegram-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="telegram-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个 Telegram 用户 ID，也可用逗号分隔"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的群组 ID</span>
+                      <textarea
+                        id="telegram-groups"
+                        data-channel-draft-key="groups"
+                        rows="4"
+                        placeholder="一行一个群组 chat.id，例如 -1001234567890"
+                      ></textarea>
+                    </label>
+                    <label class="check-field field-span-2">
+                      <input
+                        id="telegram-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>群聊默认要求 mention 机器人</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="channel-block" id="feishu-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>飞书</h3>
+                      <p class="panel-note">账号、App 凭证与私聊 / 群聊规则。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field">
+                      <span>账号 ID</span>
+                      <input id="feishu-account-id" data-channel-draft-key="accountId" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Bot 名称</span>
+                      <input id="feishu-bot-name" data-channel-draft-key="botName" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>App ID</span>
+                      <input id="feishu-app-id" data-channel-draft-key="appId" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>App Secret</span>
+                      <input id="feishu-app-secret" data-channel-draft-key="appSecret" type="password" />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="feishu-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>群组策略</span>
+                      <select id="feishu-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="feishu-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个用户 ID，也可用逗号分隔"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的群组 ID</span>
+                      <textarea
+                        id="feishu-groups"
+                        data-channel-draft-key="groups"
+                        rows="4"
+                        placeholder="一行一个飞书群组 ID"
+                      ></textarea>
+                    </label>
+                    <label class="check-field field-span-2">
+                      <input
+                        id="feishu-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>群聊默认要求 mention 机器人</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="channel-block" id="slack-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>Slack</h3>
+                      <p class="panel-note">支持 Socket Mode 与 HTTP Events，两种模式共用访问规则。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field">
+                      <span>接入模式</span>
+                      <select id="slack-mode" data-channel-draft-key="mode">
+                        <option value="socket">socket</option>
+                        <option value="http">http</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Bot Token</span>
+                      <input id="slack-bot-token" data-channel-draft-key="botToken" type="text" />
+                    </label>
+                    <label class="field" id="slack-app-token-wrap">
+                      <span>App Token</span>
+                      <input id="slack-app-token" data-channel-draft-key="appToken" type="text" />
+                    </label>
+                    <label class="field" id="slack-signing-secret-wrap">
+                      <span>Signing Secret</span>
+                      <input
+                        id="slack-signing-secret"
+                        data-channel-draft-key="signingSecret"
+                        type="password"
+                      />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="slack-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>频道策略</span>
+                      <select id="slack-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="slack-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个 Slack user ID"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的频道</span>
+                      <textarea
+                        id="slack-channels"
+                        data-channel-draft-key="channels"
+                        rows="4"
+                        placeholder="一行一个 channel ID 或 channel slug"
+                      ></textarea>
+                    </label>
+                    <label class="check-field field-span-2">
+                      <input
+                        id="slack-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>频道消息默认要求 mention</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="channel-block" id="discord-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>Discord</h3>
+                      <p class="panel-note">Bot Token、DM allowFrom 与 Guild allowlist。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field field-span-2">
+                      <span>Bot Token</span>
+                      <input id="discord-bot-token" data-channel-draft-key="botToken" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="discord-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Guild 策略</span>
+                      <select id="discord-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="discord-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个 Discord user ID"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的 Guild ID</span>
+                      <textarea
+                        id="discord-guilds"
+                        data-channel-draft-key="guilds"
+                        rows="4"
+                        placeholder="一行一个 Discord server / guild ID"
+                      ></textarea>
+                    </label>
+                    <label class="check-field field-span-2">
+                      <input
+                        id="discord-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>Guild 消息默认要求 mention</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="channel-block" id="whatsapp-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>WhatsApp</h3>
+                      <p class="panel-note">QR 登录在运行期完成，这里主要配置 account 与访问规则。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field">
+                      <span>账号 ID</span>
+                      <input id="whatsapp-account-id" data-channel-draft-key="accountId" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="whatsapp-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>群组策略</span>
+                      <select id="whatsapp-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="whatsapp-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个 WhatsApp JID 或手机号"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的群组</span>
+                      <textarea
+                        id="whatsapp-groups"
+                        data-channel-draft-key="groups"
+                        rows="4"
+                        placeholder="一行一个 WhatsApp group JID"
+                      ></textarea>
+                    </label>
+                    <label class="field field-span-2">
+                      <span>群消息 groupAllowFrom</span>
+                      <textarea
+                        id="whatsapp-group-allow-from"
+                        data-channel-draft-key="groupAllowFrom"
+                        rows="4"
+                        placeholder="可选；限制群消息发言者，一行一个 JID 或手机号"
+                      ></textarea>
+                    </label>
+                    <label class="check-field">
+                      <input
+                        id="whatsapp-self-chat-mode"
+                        data-channel-draft-key="selfChatMode"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>启用 self chat 模式</span>
+                    </label>
+                    <label class="check-field">
+                      <input
+                        id="whatsapp-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>群聊默认要求 mention</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="channel-block" id="signal-config-block" hidden>
+                  <div class="channel-head">
+                    <div>
+                      <h3>Signal</h3>
+                      <p class="panel-note">signal-cli 账号、CLI 路径与私聊 / 群聊 allowlist。</p>
+                    </div>
+                  </div>
+
+                  <div class="designer-grid">
+                    <label class="field">
+                      <span>Signal 账号</span>
+                      <input id="signal-account" data-channel-draft-key="account" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>signal-cli 路径</span>
+                      <input id="signal-cli-path" data-channel-draft-key="cliPath" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>私聊策略</span>
+                      <select id="signal-dm-policy" data-channel-draft-key="dmPolicy">
+                        <option value="pairing">pairing</option>
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>群组策略</span>
+                      <select id="signal-group-policy" data-channel-draft-key="groupPolicy">
+                        <option value="allowlist">allowlist</option>
+                        <option value="open">open</option>
+                        <option value="disabled">disabled</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>私聊 allowFrom</span>
+                      <textarea
+                        id="signal-allow-from"
+                        data-channel-draft-key="allowFrom"
+                        rows="4"
+                        placeholder="一行一个 Signal 用户号码"
+                      ></textarea>
+                    </label>
+                    <label class="field">
+                      <span>允许的群组</span>
+                      <textarea
+                        id="signal-groups"
+                        data-channel-draft-key="groups"
+                        rows="4"
+                        placeholder="一行一个 Signal group ID"
+                      ></textarea>
+                    </label>
+                    <label class="field field-span-2">
+                      <span>群消息 groupAllowFrom</span>
+                      <textarea
+                        id="signal-group-allow-from"
+                        data-channel-draft-key="groupAllowFrom"
+                        rows="4"
+                        placeholder="可选；一行一个允许发言者号码"
+                      ></textarea>
+                    </label>
+                    <label class="check-field field-span-2">
+                      <input
+                        id="signal-require-mention"
+                        data-channel-draft-key="requireMention"
+                        data-designer-boolean="true"
+                        type="checkbox"
+                      />
+                      <span>群聊默认要求 mention</span>
+                    </label>
+                  </div>
+                </section>
+              </div>
+
+              <footer class="modal-foot">
+                <button class="ghost" type="button" data-channel-modal-close>取消</button>
+                <button class="solid" id="channel-modal-save" type="submit">确定并保存</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+
+        <section class="view-panel" id="extensions-view" data-view-panel hidden>
+          <header class="view-header">
+            <div>
+              <h2>扩展</h2>
             </div>
-            <div class="stack-list">
-              <div class="stack-item">
-                <strong>1. 安装 OpenClaw</strong>
-                <p>先确认安装状态，再执行安装或更新动作，保证本地 CLI 和 Gateway 可用。</p>
-              </div>
-              <div class="stack-item">
-                <strong>2. 运行初始化向导</strong>
-                <p>保留默认值也可以，目标是尽快生成本地可工作的配置并拿到 Dashboard。</p>
-              </div>
-              <div class="stack-item">
-                <strong>3. 用运维与配置继续维护</strong>
-                <p>通过 Gateway 状态、执行输出和配置编辑器做后续调整；更复杂的流程仍可回到 CLI。</p>
-              </div>
+            <div class="view-toolbar">
+              <a class="link-button" href="https://docs.openclaw.ai/tools/plugin" target="_blank" rel="noreferrer">打开扩展文档</a>
+              <a class="ghost link-button" href="https://docs.openclaw.ai/plugins/building-plugins" target="_blank" rel="noreferrer">查看插件开发</a>
             </div>
-            <p class="panel-note compact-note">需要更完整的流程时，仍可在终端使用 <code>openclaw onboard</code> 或 <code>openclaw configure</code>。</p>
-          </article>
-        </aside>
-      </section>
+          </header>
+
+          <div class="market-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>官方入口</h3>
+                </div>
+              </div>
+              <div class="stack-list compact-stack">
+                <div class="stack-item">
+                  <strong>插件系统</strong>
+                  <p>OpenClaw 的扩展主要以插件形式接入，可增加频道、工具和模型 provider。</p>
+                </div>
+                <div class="stack-item">
+                  <strong>社区目录</strong>
+                  <p>官方当前更接近“社区插件目录”，不是独立商城；可直接浏览收录插件和安装命令。</p>
+                </div>
+              </div>
+              <div class="market-actions">
+                <a class="link-button" href="https://docs.openclaw.ai/tools/plugin" target="_blank" rel="noreferrer">插件系统</a>
+                <a class="link-button" href="https://docs.openclaw.ai/mattermost/" target="_blank" rel="noreferrer">Mattermost 示例</a>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>常用命令</h3>
+                </div>
+              </div>
+              <pre class="market-command">openclaw plugins list
+openclaw plugins install @openclaw/mattermost
+openclaw plugins install @icesword760/openclaw-wechat
+openclaw plugins remove &lt;npm-spec&gt;</pre>
+              <p class="panel-note panel-note-soft">
+                适合后续接成真正的“安装 / 卸载 / 更新扩展”页面。
+              </p>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>接入说明</h3>
+                </div>
+              </div>
+              <div class="stack-list compact-stack">
+                <div class="stack-item">
+                  <strong>支持的扩展面</strong>
+                  <p>插件可扩展 channels、tools、model providers，也可以捆绑 skills。</p>
+                </div>
+                <div class="stack-item">
+                  <strong>配置位置</strong>
+                  <p>启用后通常通过 `plugins.entries.*` 或对应频道配置段生效。</p>
+                </div>
+                <div class="stack-item">
+                  <strong>本页定位</strong>
+                  <p>当前先做“商店入口 + 安装说明”，后面可继续接本地插件扫描和状态管理。</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view-panel" id="skills-view" data-view-panel hidden>
+          <header class="view-header">
+            <div>
+              <h2>技能</h2>
+            </div>
+            <div class="view-toolbar">
+              <a class="link-button" href="https://clawhub.com" target="_blank" rel="noreferrer">打开技能商店</a>
+              <a class="ghost link-button" href="https://docs.openclaw.ai/zh-CN/tools/clawhub" target="_blank" rel="noreferrer">查看 ClawHub 文档</a>
+            </div>
+          </header>
+
+          <div class="market-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>技能列表</h3>
+                </div>
+                <span class="chip chip-quiet" id="skills-summary-chip">读取中</span>
+              </div>
+              <div class="skills-toolbar">
+                <label class="field">
+                  <span>搜索</span>
+                  <input id="skills-search" type="text" placeholder="搜索技能名、slug、发布者或摘要" />
+                </label>
+                <label class="field">
+                  <span>安装状态</span>
+                  <select class="select-field" id="skills-filter">
+                    <option value="installed">已安装</option>
+                    <option value="uninstalled">未安装</option>
+                  </select>
+                </label>
+              </div>
+              <p class="panel-note panel-note-soft" id="skills-store-hint">
+                正在读取 ClawHub 商店技能列表。
+              </p>
+              <div class="skills-table-wrap">
+                <table class="skills-table">
+                  <thead>
+                    <tr>
+                      <th>技能</th>
+                      <th>发布者</th>
+                      <th>版本</th>
+                      <th>下载量</th>
+                      <th>安装状态</th>
+                      <th>来源</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="skills-table-body"></tbody>
+                </table>
+              </div>
+              <div class="skills-load-zone">
+                <div id="skills-load-trigger" aria-hidden="true"></div>
+                <p class="panel-note panel-note-soft" id="skills-load-state">滚动到底继续加载</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <div class="modal-shell" id="skill-install-modal" hidden>
+          <div class="modal-backdrop" data-skill-install-close></div>
+          <section class="modal-panel" aria-modal="true" role="dialog">
+            <form class="modal-form" id="skill-install-form">
+              <header class="modal-head">
+                <div>
+                  <h3>安装技能</h3>
+                  <p class="panel-note" id="skill-install-name">选择安装位置后确认。</p>
+                </div>
+                <button class="ghost" id="skill-install-cancel" type="button">取消</button>
+              </header>
+
+              <div class="designer-grid">
+                <label class="field">
+                  <span>安装位置</span>
+                  <select class="select-field" id="skill-install-scope">
+                    <option value="workspace">工作空间</option>
+                    <option value="shared">共享</option>
+                  </select>
+                </label>
+                <label class="field" id="skill-install-workspace-wrap">
+                  <span>选择工作空间</span>
+                  <select class="select-field" id="skill-install-workspace"></select>
+                </label>
+              </div>
+
+              <footer class="modal-foot">
+                <button class="ghost" type="button" data-skill-install-close>取消</button>
+                <button class="solid" id="skill-install-confirm" type="submit">确定安装</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+
+        <section class="view-panel" id="config-view" data-view-panel hidden>
+
+          <header class="view-header">
+            <div>
+              <h2>配置中心</h2>
+            </div>
+          </header>
+
+          <div class="config-center-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>基础 Gateway 与默认 workspace</h3>
+                </div>
+              </div>
+
+              <div class="designer-grid">
+                <label class="field">
+                  <span>默认 Workspace</span>
+                  <input id="designer-workspace" data-designer-key="workspace" type="text" />
+                </label>
+                <label class="field">
+                  <span>Gateway 绑定</span>
+                  <select id="designer-gateway-bind" data-designer-key="gatewayBind">
+                    <option value="loopback">loopback</option>
+                    <option value="lan">lan</option>
+                    <option value="tailnet">tailnet</option>
+                    <option value="auto">auto</option>
+                    <option value="custom">custom</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Gateway 端口</span>
+                  <input
+                    id="designer-gateway-port"
+                    data-designer-key="gatewayPort"
+                    type="number"
+                    min="1"
+                    max="65535"
+                  />
+                </label>
+                <label class="field">
+                  <span>Gateway 认证</span>
+                  <select id="designer-gateway-auth" data-designer-key="gatewayAuth">
+                    <option value="token">token</option>
+                    <option value="password">password</option>
+                  </select>
+                </label>
+                <label class="field" id="designer-gateway-token-wrap">
+                  <span>Gateway Token</span>
+                  <input id="designer-gateway-token" data-designer-key="gatewayToken" type="text" />
+                </label>
+                <label class="field" id="designer-gateway-password-wrap">
+                  <span>Gateway Password</span>
+                  <input
+                    id="designer-gateway-password"
+                    data-designer-key="gatewayPassword"
+                    type="password"
+                  />
+                </label>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>频道接入模板</h3>
+                </div>
+              </div>
+              <p class="panel-note">频道配置已独立到左侧“频道”页面，这里只保留 Gateway、Agent、Bindings 和原始配置。</p>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Agent 与 workspace</h3>
+                </div>
+                <button class="ghost" id="add-agent" type="button">添加 Agent</button>
+              </div>
+              <div class="list-stack" id="agent-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>路由规则</h3>
+                </div>
+                <button class="ghost" id="add-binding" type="button">添加绑定</button>
+              </div>
+              <div class="list-stack" id="binding-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>结构化配置预览</h3>
+                </div>
+              </div>
+              <textarea id="designer-output" class="code-area" readonly></textarea>
+              <div class="toolbar">
+                <button class="solid" id="designer-apply" type="button">填入原始配置编辑器</button>
+                <button class="ghost" id="designer-save" type="button">直接保存结构化配置</button>
+              </div>
+            </article>
+
+            <article class="panel config-editor-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>原始配置编辑器</h3>
+                </div>
+                <span class="chip" id="config-path">读取中</span>
+              </div>
+              <p class="panel-note panel-note-soft">
+                结构化结果会先生成到这里，你也可以继续手动补充高级字段。
+              </p>
+              <textarea id="config-editor" class="code-area" spellcheck="false"></textarea>
+              <div class="toolbar">
+                <button class="solid" id="save-config" type="button">保存当前原始配置</button>
+                <button class="ghost" id="reload-config" type="button">重新读取配置</button>
+              </div>
+            </article>
+          </div>
+        </section>
+        </section>
+      </div>
     </main>
 
-    <script src="/js/app.js"></script>
+    <script type="module" src="/js/app/index.mjs"></script>
   </body>
 </html>

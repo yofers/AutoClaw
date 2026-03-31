@@ -75,6 +75,7 @@ const DEFAULT_CONFIG = `{
 }`;
 
 const DEFAULT_DASHBOARD_URL = "http://127.0.0.1:18789/";
+const CLAWHUB_SKILLS_ENDPOINT = "https://wry-manatee-359.convex.cloud/api/query";
 
 function ensureWebConfigFile() {
   if (fs.existsSync(WEB_CONFIG_PATH)) {
@@ -781,6 +782,270 @@ function trimOutput(value) {
   return value.trim().slice(0, 8000);
 }
 
+function expandHome(targetPath) {
+  const text = String(targetPath || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  if (text === "~") {
+    return os.homedir();
+  }
+
+  if (text.startsWith(`~${path.sep}`)) {
+    return path.join(os.homedir(), text.slice(2));
+  }
+
+  return text;
+}
+
+function extractSkillSummary(raw) {
+  const lines = String(raw || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+
+  let inFrontmatter = false;
+  for (const line of lines) {
+    if (!line) continue;
+    if (line === "---") {
+      inFrontmatter = !inFrontmatter;
+      continue;
+    }
+    if (inFrontmatter) continue;
+    if (line.startsWith("#")) continue;
+    return line;
+  }
+
+  return "";
+}
+
+function listSkillsInDirectory(rootPath, scope) {
+  if (!rootPath || !fs.existsSync(rootPath)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(rootPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const skillPath = path.join(rootPath, entry.name);
+      const skillFile = path.join(skillPath, "SKILL.md");
+      if (!fs.existsSync(skillFile)) {
+        return null;
+      }
+
+      const raw = fs.readFileSync(skillFile, "utf8");
+      return {
+        id: entry.name,
+        name: entry.name,
+        summary: extractSkillSummary(raw),
+        path: skillPath,
+        scope,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function rmrf(targetPath) {
+  fs.rmSync(targetPath, { recursive: true, force: true });
+}
+
+function readDirectoryNames(rootPath) {
+  if (!fs.existsSync(rootPath)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(rootPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+function findSkillDirectory(rootPath) {
+  if (fs.existsSync(path.join(rootPath, "SKILL.md"))) {
+    return rootPath;
+  }
+
+  const entries = readDirectoryNames(rootPath);
+  for (const entry of entries) {
+    const childPath = path.join(rootPath, entry);
+    if (fs.existsSync(path.join(childPath, "SKILL.md"))) {
+      return childPath;
+    }
+  }
+
+  return "";
+}
+
+async function fetchPublicSkillsPage(cursor = "") {
+  const pageArgs = {
+    dir: "desc",
+    highlightedOnly: false,
+    nonSuspiciousOnly: true,
+    numItems: 25,
+    sort: "downloads",
+  };
+
+  if (stringOrEmpty(cursor)) {
+    pageArgs.cursor = String(cursor);
+  }
+
+  const response = await fetch(CLAWHUB_SKILLS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      accept: "*/*",
+      "content-type": "application/json",
+      origin: "https://clawhub.ai",
+      referer: "https://clawhub.ai/",
+      "convex-client": "npm-1.34.0",
+    },
+    body: JSON.stringify({
+      path: "skills:listPublicPageV4",
+      format: "convex_encoded_json",
+      args: [pageArgs],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`ClawHub 请求失败: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const page = Array.isArray(payload?.value?.page) ? payload.value.page : [];
+
+  return {
+    hasMore: Boolean(payload?.value?.hasMore),
+    nextCursor: payload?.value?.nextCursor || null,
+    items: page.map((entry) => ({
+      id: String(entry?.skill?._id || ""),
+      slug: String(entry?.skill?.slug || ""),
+      name: String(entry?.skill?.displayName || entry?.skill?.slug || "未命名技能"),
+      summary: String(entry?.skill?.summary || ""),
+      downloads: Number(entry?.skill?.stats?.downloads || 0),
+      installs: Number(entry?.skill?.stats?.installsCurrent || 0),
+      stars: Number(entry?.skill?.stats?.stars || 0),
+      ownerHandle: String(entry?.ownerHandle || entry?.owner?.handle || ""),
+      ownerName: String(entry?.owner?.displayName || ""),
+      version: String(entry?.latestVersion?.version || ""),
+      highlighted: Boolean(entry?.skill?.badges?.highlighted),
+      url: entry?.skill?.slug ? `https://clawhub.ai/skills/${entry.skill.slug}` : "https://clawhub.ai",
+    })),
+  };
+}
+
+async function getSkillsData(cursor = "", includeInstalled = true) {
+  const onboarding = await getOnboardingDefaults();
+  const workspace = expandHome(onboarding.values.workspace || "~/.openclaw/workspace");
+  const sharedRoot = path.join(os.homedir(), ".openclaw", "skills");
+  const workspaceRoot = path.join(workspace, "skills");
+  const installed = includeInstalled
+    ? [
+        ...listSkillsInDirectory(workspaceRoot, "workspace"),
+        ...listSkillsInDirectory(sharedRoot, "shared"),
+      ]
+    : [];
+
+  let store = {
+    hasMore: false,
+    nextCursor: null,
+    items: [],
+    error: "",
+  };
+
+  try {
+    const result = await fetchPublicSkillsPage(cursor);
+    store = {
+      ...result,
+      error: "",
+    };
+  } catch (error) {
+    store.error = error.message;
+  }
+
+  return {
+    store,
+    installed,
+    workspaceRoot,
+    sharedRoot,
+  };
+}
+
+async function installSkillBySlug({ slug, scope, workspace }) {
+  const cleanedSlug = stringOrEmpty(slug);
+  if (!cleanedSlug) {
+    throw new Error("技能 slug 不能为空。");
+  }
+
+  const installScope = stringOrEmpty(scope || "workspace");
+  if (!["workspace", "shared"].includes(installScope)) {
+    throw new Error("安装位置必须是 workspace 或 shared。");
+  }
+
+  const onboarding = await getOnboardingDefaults();
+  const defaultWorkspace = expandHome(onboarding.values.workspace || "~/.openclaw/workspace");
+  const targetWorkspace =
+    installScope === "shared"
+      ? path.join(os.homedir(), ".openclaw")
+      : expandHome(workspace || defaultWorkspace);
+  const skillsRoot = path.join(targetWorkspace, "skills");
+  const installPath = path.join(skillsRoot, cleanedSlug);
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "autoclaw-skill-"));
+  const zipPath = path.join(tempRoot, `${cleanedSlug}.zip`);
+  const unpackRoot = path.join(tempRoot, "unzipped");
+  const downloadUrl = `https://wry-manatee-359.convex.site/api/v1/download?slug=${encodeURIComponent(
+    cleanedSlug
+  )}`;
+
+  try {
+    if (!(await hasCommand("unzip"))) {
+      throw new Error("本机缺少 unzip，无法解压 skills 包。");
+    }
+
+    const response = await fetch(downloadUrl, {
+      headers: {
+        accept: "*/*",
+        origin: "https://clawhub.ai",
+        referer: "https://clawhub.ai/",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`下载 skill 失败: ${response.status}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.mkdirSync(unpackRoot, { recursive: true });
+    fs.writeFileSync(zipPath, buffer);
+
+    const unzipResult = await runCommand(
+      `${buildExecutableCommand("unzip", ["-oq", zipPath, "-d", unpackRoot])}`
+    );
+    if (!unzipResult.ok) {
+      throw new Error(trimOutput(unzipResult.stderr || unzipResult.stdout || "解压失败"));
+    }
+
+    const extractedSkillDir = findSkillDirectory(unpackRoot);
+    if (!extractedSkillDir) {
+      throw new Error("下载包中未找到 SKILL.md，无法安装。");
+    }
+
+    fs.mkdirSync(skillsRoot, { recursive: true });
+    rmrf(installPath);
+    fs.cpSync(extractedSkillDir, installPath, { recursive: true });
+
+    return {
+      ok: true,
+      slug: cleanedSlug,
+      scope: installScope,
+      installedPath: installPath,
+      downloadUrl,
+    };
+  } finally {
+    rmrf(tempRoot);
+  }
+}
+
 function gatewayServiceInstalled(statusText) {
   return !/Service not installed|Service unit not found/i.test(String(statusText || ""));
 }
@@ -1259,6 +1524,7 @@ function backupName(filePath) {
 function contentType(filePath) {
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
   if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
+  if (filePath.endsWith(".mjs")) return "application/javascript; charset=utf-8";
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   return "text/plain; charset=utf-8";
 }
@@ -1397,6 +1663,25 @@ async function handleApi(req, res, pathname) {
         raw: fs.readFileSync(paths.configPath, "utf8"),
       })
     );
+    return;
+  }
+
+  if (req.method === "GET" && normalizedPathname === "/api/skills") {
+    send(res, json(await getSkillsData()));
+    return;
+  }
+
+  if (req.method === "POST" && normalizedPathname === "/api/skills/page") {
+    const raw = await readBody(req);
+    const body = raw ? JSON.parse(raw) : {};
+    send(res, json(await getSkillsData(body.cursor, false)));
+    return;
+  }
+
+  if (req.method === "POST" && normalizedPathname === "/api/skills/install") {
+    const raw = await readBody(req);
+    const body = raw ? JSON.parse(raw) : {};
+    send(res, json(await installSkillBySlug(body)));
     return;
   }
 

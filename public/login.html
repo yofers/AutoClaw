@@ -12,16 +12,30 @@
         <p class="eyebrow">PRIVATE ACCESS</p>
         <h1 id="login-app-title">{{APP_TITLE}}</h1>
         <p class="login-copy" id="login-app-subtitle">{{APP_SUBTITLE}}</p>
+
+        <div class="login-meter-grid">
+          <article class="meta-block">
+            <span class="summary-label">访问范围</span>
+            <strong>本地安装、状态与配置控制</strong>
+            <p>适合开发者或本机运维场景，减少终端、配置文件与 Dashboard 之间的来回切换。</p>
+          </article>
+          <article class="meta-block meta-block-toned">
+            <span class="summary-label">保护目的</span>
+            <strong>进入主控制台前先校验身份</strong>
+            <p>登录、会话时长与监听参数统一定义在 <code>config/web.yaml</code> 中。</p>
+          </article>
+        </div>
+
         <div class="login-story-grid">
           <article class="login-story-item">
             <span class="summary-label">本地控制</span>
-            <strong>安装、状态、配置在同一面板完成</strong>
-            <p>适合开发者或本机运维场景，减少来回切换终端与配置文件。</p>
+            <strong>安装、状态、配置在同一工作面完成</strong>
+            <p>首页会把关键状态放在总览区，后续动作和日志按模块拆分，不再堆在单个长页面里。</p>
           </article>
           <article class="login-story-item">
-            <span class="summary-label">权限隔离</span>
-            <strong>主面板访问前先做身份校验</strong>
-            <p>登录、会话时长和监听参数都定义在 <code>config/web.yaml</code>。</p>
+            <span class="summary-label">状态优先</span>
+            <strong>先判断再操作，减少误触发</strong>
+            <p>OpenClaw、Gateway 和配置文件状态会先展示，再暴露最合理的下一步动作。</p>
           </article>
         </div>
       </section>

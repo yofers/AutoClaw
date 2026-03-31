@@ -5,7 +5,7 @@
   "description": "Local OpenClaw deployment helper with a built-in config editor.",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node --check server/index.js && node --check public/js/app.js"
+    "check": "node --check server/index.js && node --check public/js/login.js && node --check public/js/app/index.mjs && node --check public/js/app/api.mjs && node --check public/js/app/actions.mjs && node --check public/js/app/constants.mjs && node --check public/js/app/designer.mjs && node --check public/js/app/dom.mjs && node --check public/js/app/render.mjs && node --check public/js/app/state.mjs"
   },
   "engines": {
     "node": ">=22"
