@@ -63,6 +63,18 @@
               </span>
               <span class="sidebar-nav-label">频道</span>
             </button>
+            <button class="sidebar-nav-button" data-view-target="models-view" type="button">
+              <span class="sidebar-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M5 6.5H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M5 10H11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M5 13.5H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M14.5 14.5C15.6046 14.5 16.5 13.6046 16.5 12.5C16.5 11.3954 15.6046 10.5 14.5 10.5C13.3954 10.5 12.5 11.3954 12.5 12.5C12.5 13.6046 13.3954 14.5 14.5 14.5Z" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M14.5 8V10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="sidebar-nav-label">模型</span>
+            </button>
             <button class="sidebar-nav-button" data-view-target="extensions-view" type="button">
               <span class="sidebar-nav-icon" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none">
@@ -140,7 +152,7 @@
             </article>
           </div>
 
-          <div class="dashboard-grid">
+          <div class="config-center-grid">
             <article class="panel">
               <div class="panel-head">
                 <div>
@@ -148,30 +160,6 @@
                 </div>
               </div>
               <dl class="status-list status-list-wide" id="status-list"></dl>
-            </article>
-
-            <article class="panel">
-              <div class="panel-head">
-                <div>
-                  <h3>Gateway 摘要</h3>
-                </div>
-              </div>
-              <div class="gateway-overview">
-                <div class="gateway-card" id="gateway-installed-card">
-                  <span class="gateway-label">Gateway 服务已安装</span>
-                  <strong class="gateway-value" id="gateway-service-installed">加载中</strong>
-                </div>
-                <div class="gateway-card" id="gateway-loaded-card">
-                  <span class="gateway-label">Gateway 服务已加载</span>
-                  <strong class="gateway-value" id="gateway-service-loaded">加载中</strong>
-                </div>
-              </div>
-              <div class="stack-list compact-stack">
-                <div class="stack-item">
-                  <strong>推荐动作</strong>
-                  <p>Gateway 未加载就去运维中心，配置未建好就去配置中心。</p>
-                </div>
-              </div>
             </article>
           </div>
         </section>
@@ -183,7 +171,7 @@
             </div>
             <div class="view-toolbar">
               <button class="solid" id="install-button" data-action="install">安装 OpenClaw</button>
-              <button class="danger" data-action="uninstall">卸载 OpenClaw</button>
+              <button class="danger" id="uninstall-button" data-action="uninstall">卸载 OpenClaw</button>
             </div>
           </header>
 
@@ -196,14 +184,6 @@
               </div>
 
               <div class="action-grid">
-                <button class="action-tile" data-action="doctor">
-                  <span class="action-title">Doctor</span>
-                  <span class="action-meta">检查依赖、安装路径和本地环境。</span>
-                </button>
-                <button class="action-tile" data-action="status">
-                  <span class="action-title">Gateway 状态</span>
-                  <span class="action-meta">读取当前服务状态和 Gateway 输出。</span>
-                </button>
                 <button class="action-tile" data-action="start">
                   <span class="action-title">启动 Gateway</span>
                   <span class="action-meta">必要时会先补装服务，再启动中台。</span>
@@ -216,10 +196,6 @@
                   <span class="action-title">停止 Gateway</span>
                   <span class="action-meta">停止本地中台，保留安装与配置。</span>
                 </button>
-                <button class="action-tile" data-action="dashboard">
-                  <span class="action-title">打印 Dashboard 链接</span>
-                  <span class="action-meta">确认当前可访问的本地入口地址。</span>
-                </button>
               </div>
             </article>
 
@@ -231,111 +207,35 @@
                 <span class="chip" id="wizard-chip">准备中</span>
               </div>
               <p class="panel-note panel-note-soft">
-                这里处理本地初始化；频道配置放在配置中心。
+                这里会按 OpenClaw 当前默认值执行首次本地初始化；频道、模型和高级配置继续在其他页面处理。
               </p>
 
               <form id="onboard-form" class="wizard-form">
-                <div class="wizard-grid">
-                  <label class="field">
-                    <span>模型认证</span>
-                    <select id="auth-choice" name="authChoice">
-                      <option value="skip">暂不配置模型 Provider</option>
-                      <option value="openai-api-key">OpenAI API Key</option>
-                      <option value="anthropic-api-key">Anthropic API Key</option>
-                      <option value="gemini-api-key">Gemini API Key</option>
-                      <option value="openrouter-api-key">OpenRouter API Key</option>
-                    </select>
-                  </label>
-
-                  <label class="field" id="model-api-key-field">
-                    <span>模型 API Key</span>
-                    <input
-                      id="model-api-key"
-                      name="modelApiKey"
-                      type="password"
-                      autocomplete="off"
-                      placeholder="只在选择模型 Provider 时需要"
-                    />
-                  </label>
-
-                  <label class="field">
-                    <span>Workspace</span>
-                    <input
-                      id="workspace-input"
-                      name="workspace"
-                      type="text"
-                      placeholder="留空时使用默认值 ~/.openclaw/workspace"
-                    />
-                  </label>
-
-                  <label class="field">
-                    <span>Gateway 绑定</span>
-                    <select id="gateway-bind" name="gatewayBind">
-                      <option value="loopback">loopback</option>
-                      <option value="lan">lan</option>
-                      <option value="tailnet">tailnet</option>
-                      <option value="auto">auto</option>
-                      <option value="custom">custom</option>
-                    </select>
-                  </label>
-
-                  <label class="field">
-                    <span>Gateway 端口</span>
-                    <input
-                      id="gateway-port"
-                      name="gatewayPort"
-                      type="number"
-                      min="1"
-                      max="65535"
-                      placeholder="留空时使用默认值 18789"
-                    />
-                  </label>
-
-                  <label class="field">
-                    <span>Gateway 认证</span>
-                    <select id="gateway-auth" name="gatewayAuth">
-                      <option value="token">token</option>
-                      <option value="password">password</option>
-                    </select>
-                  </label>
-
-                  <label class="field" id="gateway-token-field">
-                    <span>Gateway Token</span>
-                    <input
-                      id="gateway-token"
-                      name="gatewayToken"
-                      type="text"
-                      autocomplete="off"
-                      placeholder="留空时自动生成"
-                    />
-                  </label>
-
-                  <label class="field" id="gateway-password-field">
-                    <span>Gateway Password</span>
-                    <input
-                      id="gateway-password"
-                      name="gatewayPassword"
-                      type="password"
-                      autocomplete="off"
-                      placeholder="选择 password 模式后必填"
-                    />
-                  </label>
-                </div>
-
-                <div class="inline-options">
-                  <label class="switch-row">
-                    <input id="install-daemon" name="installDaemon" type="checkbox" checked />
-                    <span>安装并托管 Gateway daemon</span>
-                  </label>
-                  <label class="switch-row">
-                    <input id="risk-accepted" name="riskAccepted" type="checkbox" />
-                    <span>我理解 agent 具备本机执行能力，并接受对应风险</span>
-                  </label>
+                <div class="stack-list compact-stack">
+                  <div class="stack-item">
+                    <strong>Workspace</strong>
+                    <p id="onboard-default-workspace">加载中</p>
+                  </div>
+                  <div class="stack-item">
+                    <strong>Gateway 绑定</strong>
+                    <p id="onboard-default-bind">加载中</p>
+                  </div>
+                  <div class="stack-item">
+                    <strong>Gateway 端口</strong>
+                    <p id="onboard-default-port">加载中</p>
+                  </div>
+                  <div class="stack-item">
+                    <strong>Gateway 认证</strong>
+                    <p id="onboard-default-auth">加载中</p>
+                  </div>
+                  <div class="stack-item">
+                    <strong>Daemon</strong>
+                    <p id="onboard-default-daemon">加载中</p>
+                  </div>
                 </div>
 
                 <div class="toolbar">
-                  <button class="solid" id="run-onboard" type="submit">运行初始化向导</button>
-                  <button class="ghost" id="reload-onboard" type="button">重载默认值</button>
+                  <button class="solid" id="run-onboard" type="submit">按默认值初始化</button>
                 </div>
               </form>
             </article>
@@ -842,6 +742,103 @@
             </form>
           </section>
         </div>
+
+        <section class="view-panel" id="models-view" data-view-panel hidden>
+          <header class="view-header">
+            <div>
+              <h2>模型</h2>
+            </div>
+            <div class="view-toolbar">
+              <a class="link-button" href="https://docs.openclaw.ai/zh-CN/concepts/model-providers" target="_blank" rel="noreferrer">Provider 文档</a>
+              <a class="ghost link-button" href="https://docs.openclaw.ai/concepts/models" target="_blank" rel="noreferrer">模型配置文档</a>
+            </div>
+          </header>
+
+          <div class="models-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>默认模型策略</h3>
+                  <p class="panel-note">这里写入 <code>agents.defaults.model</code> 和 <code>agents.defaults.models</code>。</p>
+                </div>
+              </div>
+
+              <div class="hero-grid">
+                <article class="summary-card">
+                  <span class="summary-label">Primary</span>
+                  <strong class="summary-value" id="model-summary-primary">未设置</strong>
+                  <span class="summary-detail">默认模型引用</span>
+                </article>
+                <article class="summary-card">
+                  <span class="summary-label">Fallbacks</span>
+                  <strong class="summary-value" id="model-summary-fallbacks">未设置</strong>
+                  <span class="summary-detail">主模型不可用时按顺序切换</span>
+                </article>
+                <article class="summary-card">
+                  <span class="summary-label">Allowlist</span>
+                  <strong class="summary-value" id="model-summary-allowlist">未设置</strong>
+                  <span class="summary-detail">用于 /model 与会话选择限制</span>
+                </article>
+              </div>
+
+              <div class="designer-grid">
+                <label class="field">
+                  <span>Provider</span>
+                  <select class="select-field" id="model-provider" data-designer-key="modelProvider"></select>
+                </label>
+                <label class="field">
+                  <span>主模型 ID</span>
+                  <input
+                    id="model-id"
+                    data-designer-key="modelId"
+                    type="text"
+                    list="model-example-list"
+                    placeholder="例如 gpt-5.4 或 anthropic/claude-sonnet-4-5"
+                  />
+                  <datalist id="model-example-list"></datalist>
+                </label>
+                <label class="field field-span-2">
+                  <span>主模型引用预览</span>
+                  <div class="model-ref-preview" id="model-primary-preview">未设置</div>
+                </label>
+                <label class="field field-span-2">
+                  <span>回退模型</span>
+                  <textarea
+                    id="model-fallbacks"
+                    data-designer-key="modelFallbacks"
+                    rows="5"
+                    placeholder="一行一个 provider/model，例如&#10;anthropic/claude-opus-4-6&#10;openrouter/anthropic/claude-sonnet-4-5"
+                  ></textarea>
+                </label>
+                <label class="field field-span-2">
+                  <span>允许模型 / 别名</span>
+                  <textarea
+                    id="model-allowlist"
+                    data-designer-key="modelAllowlist"
+                    rows="6"
+                    placeholder="一行一个 provider/model；也支持&#10;provider/model | 别名&#10;provider/model | {&quot;alias&quot;:&quot;主力&quot;,&quot;params&quot;:{}}"
+                  ></textarea>
+                </label>
+              </div>
+
+              <p class="panel-note panel-note-soft" id="model-provider-hint">
+                模型引用统一使用 provider/model 格式。
+              </p>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>官方 Provider 参考</h3>
+                  <p class="panel-note">
+                    这里给出常用官方 provider 参考。即使未列出完整模型，也可以直接填写官方文档支持的 provider/model。
+                  </p>
+                </div>
+              </div>
+              <div class="provider-list" id="model-provider-list"></div>
+            </article>
+          </div>
+        </section>
 
         <section class="view-panel" id="extensions-view" data-view-panel hidden>
           <header class="view-header">

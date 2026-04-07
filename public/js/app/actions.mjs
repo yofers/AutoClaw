@@ -28,11 +28,11 @@ import {
 } from "./designer.mjs";
 import {
   applyBusyState,
-  fillOnboardForm,
   getViewIdFromLocation,
   mergeSkillStorePages,
   printConsole,
   renderConfig,
+  renderOnboardDefaults,
   renderSkills,
   renderStatus,
   setActiveView,
@@ -40,9 +40,7 @@ import {
   syncActiveViewFromLocation,
   syncSkillsQueryToLocation,
   syncSkillsStateFromLocation,
-  syncOnboardFieldVisibility,
   updateSyncStamp,
-  validateOnboardForm,
 } from "./render.mjs";
 import { state } from "./state.mjs";
 
@@ -95,17 +93,34 @@ async function pollActionJob(jobId, action) {
 }
 
 function readOnboardPayload() {
+  const defaults = state.onboardDefaults || {};
   return {
-    authChoice: dom.authChoiceInput.value,
-    modelApiKey: dom.modelApiKeyInput.value,
-    workspace: dom.workspaceInput.value,
-    gatewayBind: dom.gatewayBindInput.value,
-    gatewayPort: dom.gatewayPortInput.value,
-    gatewayAuth: dom.gatewayAuthInput.value,
-    gatewayToken: dom.gatewayTokenInput.value,
-    gatewayPassword: dom.gatewayPasswordInput.value,
-    installDaemon: dom.installDaemonInput.checked,
-    riskAccepted: dom.riskAcceptedInput.checked,
+    authChoice: defaults.authChoice || "skip",
+    modelApiKey: defaults.modelApiKey || "",
+    workspace: defaults.workspace || "~/.openclaw/workspace",
+    gatewayBind: defaults.gatewayBind || "loopback",
+    gatewayPort: defaults.gatewayPort || 18789,
+    gatewayAuth: defaults.gatewayAuth || "token",
+    gatewayToken: defaults.gatewayToken || "",
+    gatewayPassword: defaults.gatewayPassword || "",
+    installDaemon: defaults.installDaemon !== false,
+    riskAccepted: true,
+  };
+}
+
+function prepareAutoOnboarding(action) {
+  if (action !== "install" || dom.installButton.textContent.trim() !== "安装 OpenClaw") {
+    return {
+      enabled: false,
+      reason: "",
+      payload: null,
+    };
+  }
+
+  return {
+    enabled: true,
+    reason: "",
+    payload: readOnboardPayload(),
   };
 }
 
@@ -144,7 +159,8 @@ export async function hydrateApp() {
   renderConfig(config);
   renderSkills(skills);
   state.skills.data = skills;
-  fillOnboardForm(onboard.values);
+  state.onboardDefaults = onboard.values;
+  renderOnboardDefaults(onboard.values);
 
   if (!state.designerInitialized) {
     seedDesigner(onboard.values);
@@ -178,7 +194,8 @@ async function refreshConfigOnly() {
 
 async function refreshOnboardOnly() {
   const onboard = await loadOnboardDefaults();
-  fillOnboardForm(onboard.values);
+  state.onboardDefaults = onboard.values;
+  renderOnboardDefaults(onboard.values);
   updateSyncStamp();
 }
 
@@ -226,6 +243,8 @@ async function loadMoreSkills() {
 }
 
 async function runAction(action) {
+  const autoOnboarding = prepareAutoOnboarding(action);
+
   if (
     action === "uninstall" &&
     !window.confirm("这会卸载 OpenClaw 服务并删除本地状态、配置和安装目录。确认继续？")
@@ -237,23 +256,38 @@ async function runAction(action) {
   printConsole(`执行 ${action}...`, {
     stdout:
       action === "install"
-        ? "正在调用 OpenClaw 官方安装器。首次安装通常需要几分钟；如果网络较慢，日志会稍后出现。"
+        ? autoOnboarding.enabled
+          ? "正在调用 OpenClaw 官方安装器。安装成功后会继续自动执行初始化向导。"
+          : "正在调用 OpenClaw 官方安装器。首次安装通常需要几分钟；如果网络较慢，日志会稍后出现。"
         : "",
   });
 
   const job = await createAction(action);
   const result = await pollActionJob(job.id, action);
+
+  if (action === "install" && result.ok && autoOnboarding.enabled) {
+    await runOnboardingFlow(autoOnboarding.payload);
+    return result;
+  }
+
   await hydrateApp();
+
+  if (action === "install" && result.ok && autoOnboarding.reason) {
+    printConsole("安装已完成", {
+      stdout: `OpenClaw 已安装，但未自动执行初始化向导：${autoOnboarding.reason}`,
+    });
+  }
+
   return result;
 }
 
-async function runOnboardingFlow() {
+async function runOnboardingFlow(payload = readOnboardPayload()) {
   printConsole("执行 onboard...", {
     stdout:
       "正在调用 openclaw onboard --non-interactive。这个流程会跳过 channels / skills / search，只完成本地 Gateway 初始化。",
   });
 
-  const job = await runOnboard(readOnboardPayload());
+  const job = await runOnboard(payload);
   const result = await pollActionJob(job.id, "onboard");
   await hydrateApp();
   return result;
@@ -580,7 +614,6 @@ export function bindAppInteractions() {
   bindViewNavigation();
   bindSkillsInteractions();
   bindDesignerInteractions();
-  syncOnboardFieldVisibility();
   applyBusyState();
 
   dom.refreshStatusButton.addEventListener("click", () =>
@@ -611,15 +644,6 @@ export function bindAppInteractions() {
     })
   );
 
-  dom.reloadOnboardButton.addEventListener("click", () =>
-    withBusy(async () => {
-      await refreshOnboardOnly();
-      printConsole("初始化向导默认值已刷新", {});
-    }).catch((error) => {
-      printConsole("加载向导默认值失败", { stderr: error.message });
-    })
-  );
-
   dom.logoutButton.addEventListener("click", () =>
     withBusy(async () => {
       await logout();
@@ -629,17 +653,8 @@ export function bindAppInteractions() {
     })
   );
 
-  dom.authChoiceInput.addEventListener("change", syncOnboardFieldVisibility);
-  dom.gatewayAuthInput.addEventListener("change", syncOnboardFieldVisibility);
-
   dom.onboardForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const validationError = validateOnboardForm();
-    if (validationError) {
-      printConsole("初始化向导未开始", { stderr: validationError });
-      return;
-    }
-
     withBusy(runOnboardingFlow).catch((error) => {
       printConsole("初始化向导失败", { stderr: error.message });
     });

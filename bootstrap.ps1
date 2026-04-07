@@ -37,6 +37,38 @@ function Find-OpenClaw {
   return $null
 }
 
+function Get-WebConfigValue($RootDir, $Section, $Key, $DefaultValue) {
+  $configPath = Join-Path $RootDir "config\web.yaml"
+  if (-not (Test-Path $configPath)) {
+    return $DefaultValue
+  }
+
+  $currentSection = ""
+  foreach ($line in Get-Content $configPath) {
+    if ($line -match '^\s*#' -or $line -match '^\s*$') {
+      continue
+    }
+
+    if ($line -match '^([^\s][^:]*):\s*$') {
+      $currentSection = $matches[1]
+      continue
+    }
+
+    if ($currentSection -eq $Section -and $line -match "^\s{2}$Key:\s*(.+?)\s*$") {
+      $value = $matches[1].Trim()
+      if (
+        ($value.StartsWith('"') -and $value.EndsWith('"')) -or
+        ($value.StartsWith("'") -and $value.EndsWith("'"))
+      ) {
+        return $value.Substring(1, $value.Length - 2)
+      }
+      return $value
+    }
+  }
+
+  return $DefaultValue
+}
+
 function Test-ProjectRoot($Dir) {
   return (Test-Path (Join-Path $Dir "server\index.js")) -and (Test-Path (Join-Path $Dir "public\index.html"))
 }
@@ -157,6 +189,8 @@ function Ensure-Node {
 
 Ensure-Node
 $RootDir = Resolve-RootDir
+$HostIp = Get-WebConfigValue $RootDir "server" "host" $HostIp
+$Port = Get-WebConfigValue $RootDir "server" "port" $Port
 
 $OpenClawPath = Find-OpenClaw
 if ($OpenClawPath) {

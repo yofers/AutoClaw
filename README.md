@@ -76,6 +76,25 @@ irm https://raw.githubusercontent.com/<user>/<repo>/<tag-or-branch>/bootstrap.ps
 http://127.0.0.1:31870/
 ```
 
+Web 管理页配置统一放在 `config/web.yaml`，包括：
+
+- `server.host`
+- `server.port`
+- `auth.*`
+- `security.loopbackOnly`
+
+如果你要在 VPS 上远程访问管理页，至少要改这两项：
+
+```yaml
+server:
+  host: "0.0.0.0"
+
+security:
+  loopbackOnly: false
+```
+
+同时请自行配好防火墙、反向代理和强密码。默认配置仍然偏向本地使用。
+
 ## 目录
 
 - `bootstrap.sh`: macOS / Linux 一键入口
@@ -89,6 +108,7 @@ http://127.0.0.1:31870/
 - Windows 平台按官方建议，实际运行 OpenClaw 时更推荐 WSL2；这里仍保留了 PowerShell 安装入口。
 - OpenClaw 的完整配置能力本身已经存在于官方 Dashboard Config Tab，本工具更偏向“统一入口”和“开箱部署”。
 - 远程启动模式依赖 GitHub 仓库公开可访问；如果未安装 `git`，脚本会回退到归档下载。
+- `config/auth.yaml` 已不再使用，Web 登录配置统一以 `config/web.yaml` 为准。
 
 ## 发布建议
 

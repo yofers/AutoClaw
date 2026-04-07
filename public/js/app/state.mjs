@@ -3,7 +3,9 @@ import { createDefaultChannelState, createDesignerState } from "./constants.mjs"
 export const state = {
   busy: false,
   installLocked: false,
+  uninstallLocked: false,
   onboardingLocked: false,
+  onboardDefaults: null,
   lastSyncAt: 0,
   activeViewId: "dashboard-view",
   designer: createDesignerState(),

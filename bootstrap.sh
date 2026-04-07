@@ -8,8 +8,8 @@ REMOTE_REPO="${AUTOOPENCLAW_REPO:-${DEFAULT_REMOTE_REPO}}"
 REMOTE_REF="${AUTOOPENCLAW_REF:-main}"
 CACHE_ROOT="${AUTOOPENCLAW_CACHE_DIR:-${TMPDIR:-/tmp}/auto-openclaw-bootstrap}"
 STATE_DIR_NAME=".autoclaw"
-DEFAULT_WEB_CONFIG=$'# AutoOpenClaw Web manager configuration\n# Changes to host/port require restarting the manager process.\n\nserver:\n  host: "127.0.0.1"\n  port: 31870\n\nsite:\n  title: "AutoOpenClaw"\n  subtitle: "本地优先、状态清晰、动作可回退的 OpenClaw 控制面板"\n\nauth:\n  enabled: true\n  username: "admin"\n  password: "change-this-password"\n  sessionTtlHours: 12\n\nsecurity:\n  loopbackOnly: true\n'
-MENU_KEYS=("1" "2" "4" "5" "6" "7" "8")
+DEFAULT_WEB_CONFIG=$'# AutoOpenClaw Web manager configuration\n# Changes to host/port require restarting the manager process.\n# To allow remote access on a VPS:\n# 1. set server.host to "0.0.0.0"\n# 2. set security.loopbackOnly to false\n\nserver:\n  host: "127.0.0.1"\n  port: 31870\n\nsite:\n  title: "AutoOpenClaw"\n  subtitle: "本地优先、状态清晰、动作可回退的 OpenClaw 控制面板"\n\nauth:\n  enabled: true\n  username: "admin"\n  password: "change-this-password"\n  sessionTtlHours: 12\n\nsecurity:\n  loopbackOnly: true\n'
+MENU_KEYS=("1" "2" "4" "5" "6" "7" "8" "9")
 
 if [[ -t 1 ]]; then
   COLOR_RESET=$'\033[0m'
@@ -935,6 +935,24 @@ change_port() {
   MESSAGE="端口已更新为 ${next_port}。如果面板正在运行，请重启面板使其生效。"
 }
 
+change_host() {
+  ROOT_DIR="$(resolve_root_dir)"
+  ensure_web_config
+
+  local next_host
+  next_host="$(prompt_input "修改监听地址" "请输入新的 Web 监听地址（如 127.0.0.1 或 0.0.0.0）:" "$(panel_host)")"
+  next_host="${next_host#"${next_host%%[![:space:]]*}"}"
+  next_host="${next_host%"${next_host##*[![:space:]]}"}"
+
+  if [[ -z "${next_host}" ]]; then
+    MESSAGE="监听地址不能为空。"
+    return
+  fi
+
+  yaml_replace_value "server" "host" "$(yaml_quote "${next_host}")"
+  MESSAGE="监听地址已更新为 ${next_host}。如果面板正在运行，请重启面板使其生效。"
+}
+
 change_password() {
   ROOT_DIR="$(resolve_root_dir)"
   ensure_web_config
@@ -1019,9 +1037,10 @@ draw_menu() {
   render_option "2" "$(panel_action_label)" "检测本地面板版本并安装或更新项目文件。" "$([[ "${selected_index}" -eq 1 ]] && printf 'true' || printf 'false')"
   render_option "4" "$(service_action_label)" "启动本地 Web 面板；若已运行则停止。" "$([[ "${selected_index}" -eq 2 ]] && printf 'true' || printf 'false')"
   render_option "5" "卸载面板" "删除当前目录下的面板项目文件，保留启动脚本。" "$([[ "${selected_index}" -eq 3 ]] && printf 'true' || printf 'false')"
-  render_option "6" "修改端口" "更新 config/web.yaml 中的 server.port。" "$([[ "${selected_index}" -eq 4 ]] && printf 'true' || printf 'false')"
-  render_option "7" "修改密码" "更新 config/web.yaml 中的登录密码。" "$([[ "${selected_index}" -eq 5 ]] && printf 'true' || printf 'false')"
-  render_option "8" "退出脚本" "关闭启动菜单，结束当前会话。" "$([[ "${selected_index}" -eq 6 ]] && printf 'true' || printf 'false')"
+  render_option "6" "修改监听地址" "更新 config/web.yaml 中的 server.host。" "$([[ "${selected_index}" -eq 4 ]] && printf 'true' || printf 'false')"
+  render_option "7" "修改端口" "更新 config/web.yaml 中的 server.port。" "$([[ "${selected_index}" -eq 5 ]] && printf 'true' || printf 'false')"
+  render_option "8" "修改密码" "更新 config/web.yaml 中的登录密码。" "$([[ "${selected_index}" -eq 6 ]] && printf 'true' || printf 'false')"
+  render_option "9" "退出脚本" "关闭启动菜单，结束当前会话。" "$([[ "${selected_index}" -eq 7 ]] && printf 'true' || printf 'false')"
 
   if [[ -n "${MESSAGE}" ]]; then
     printf '\n%s%s%s\n' "${COLOR_WARNING}" "${MESSAGE}" "${COLOR_RESET}"
@@ -1048,8 +1067,8 @@ read_menu_key() {
     $'\x0a'|$'\x0d') printf 'enter' ;;
     k|K) printf 'up' ;;
     j|J) printf 'down' ;;
-    1|2|4|5|6|7|8) printf '%s' "${key}" ;;
-    q|Q) printf '8' ;;
+    1|2|4|5|6|7|8|9) printf '%s' "${key}" ;;
+    q|Q) printf '9' ;;
     *) printf 'noop' ;;
   esac
 }
@@ -1079,12 +1098,15 @@ execute_selection() {
       uninstall_panel
       ;;
     6)
-      change_port
+      change_host
       ;;
     7)
-      change_password
+      change_port
       ;;
     8)
+      change_password
+      ;;
+    9)
       clear_screen
       exit 0
       ;;
@@ -1118,7 +1140,7 @@ main() {
         execute_selection "${MENU_KEYS[${selected_index}]}"
         refresh_runtime_state
         ;;
-      1|2|4|5|6|7|8)
+      1|2|4|5|6|7|8|9)
         MESSAGE=""
         execute_selection "${action}"
         refresh_runtime_state

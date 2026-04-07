@@ -2,6 +2,7 @@ import {
   CHANNEL_LABELS,
   CHANNEL_METADATA,
   CHANNEL_TYPE_ORDER,
+  MODEL_PROVIDER_METADATA,
   createAgent,
   createBinding,
   createDefaultChannelState,
@@ -22,6 +23,13 @@ function escapeHtml(value) {
 function listValues(raw) {
   return String(raw || "")
     .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function lineValues(raw) {
+  return String(raw || "")
+    .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -64,6 +72,94 @@ function joinScopeKeys(map) {
 
 function hasRequireMention(map) {
   return Boolean(map?.["*"]?.requireMention) || Object.values(map || {}).some((item) => item?.requireMention);
+}
+
+function splitModelRef(modelRef) {
+  const value = String(modelRef || "").trim();
+  if (!value || !value.includes("/")) {
+    return {
+      provider: "",
+      modelId: value,
+    };
+  }
+
+  const separatorIndex = value.indexOf("/");
+  return {
+    provider: value.slice(0, separatorIndex),
+    modelId: value.slice(separatorIndex + 1),
+  };
+}
+
+function buildModelRef(provider, modelId) {
+  const safeProvider = String(provider || "").trim();
+  const safeModelId = String(modelId || "").trim();
+
+  if (!safeProvider || !safeModelId) {
+    return "";
+  }
+
+  return `${safeProvider}/${safeModelId}`;
+}
+
+function parseModelCatalog(raw) {
+  return lineValues(raw).reduce((catalog, line) => {
+    const [modelRefPart, aliasPart] = String(line).split("|");
+    const modelRef = String(modelRefPart || "").trim();
+    const meta = String(aliasPart || "").trim();
+
+    if (!modelRef) {
+      return catalog;
+    }
+
+    if (!meta) {
+      catalog[modelRef] = {};
+      return catalog;
+    }
+
+    if (meta.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(meta);
+        catalog[modelRef] =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+        return catalog;
+      } catch {
+        catalog[modelRef] = { alias: meta };
+        return catalog;
+      }
+    }
+
+    catalog[modelRef] = { alias: meta };
+    return catalog;
+  }, {});
+}
+
+function serializeModelCatalog(models) {
+  if (!models || typeof models !== "object") {
+    return "";
+  }
+
+  return Object.entries(models)
+    .map(([modelRef, config]) => {
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return modelRef;
+      }
+
+      const keys = Object.keys(config);
+      if (keys.length === 0) {
+        return modelRef;
+      }
+
+      if (keys.length === 1 && keys[0] === "alias") {
+        return `${modelRef} | ${config.alias || ""}`;
+      }
+
+      return `${modelRef} | ${JSON.stringify(config)}`;
+    })
+    .join("\n");
+}
+
+function providerExamples(providerId) {
+  return MODEL_PROVIDER_METADATA.find((item) => item.id === providerId)?.examples || [];
 }
 
 function summarizeList(raw) {
@@ -590,9 +686,16 @@ export function hydrateDesignerFromConfigRaw(raw) {
   const auth = gateway.auth || {};
   const agents = parsed.agents || {};
   const defaults = agents.defaults || {};
+  const defaultModel =
+    typeof defaults.model === "string"
+      ? { primary: defaults.model }
+      : defaults.model && typeof defaults.model === "object"
+        ? defaults.model
+        : {};
   const list = Array.isArray(agents.list) ? agents.list : [];
   const bindings = Array.isArray(parsed.bindings) ? parsed.bindings : [];
   const channels = parsed.channels || {};
+  const primaryModel = splitModelRef(defaultModel.primary || "");
 
   state.designer.workspace = defaults.workspace || state.designer.workspace;
   state.designer.gatewayBind = gateway.bind || state.designer.gatewayBind;
@@ -600,6 +703,10 @@ export function hydrateDesignerFromConfigRaw(raw) {
   state.designer.gatewayAuth = auth.mode === "password" ? "password" : "token";
   state.designer.gatewayToken = auth.token || "";
   state.designer.gatewayPassword = auth.password || "";
+  state.designer.modelProvider = primaryModel.provider || state.designer.modelProvider;
+  state.designer.modelId = primaryModel.modelId || "";
+  state.designer.modelFallbacks = joinArray(defaultModel.fallbacks);
+  state.designer.modelAllowlist = serializeModelCatalog(defaults.models);
 
   state.designer.telegram = hydrateTelegramChannel(channels.telegram);
   state.designer.feishu = hydrateFeishuChannel(channels.feishu);
@@ -636,6 +743,13 @@ export function hydrateDesignerFromConfigRaw(raw) {
 export function buildStructuredConfig() {
   normalizeAgents();
   normalizeBindings();
+
+  const primaryModelRef = buildModelRef(
+    state.designer.modelProvider,
+    state.designer.modelId
+  );
+  const fallbackModels = listValues(state.designer.modelFallbacks);
+  const allowedModels = parseModelCatalog(state.designer.modelAllowlist);
 
   const serializedAgents = state.designer.agents
     .filter((agent) => agent.id.trim().length > 0)
@@ -687,6 +801,22 @@ export function buildStructuredConfig() {
       list: serializedAgents,
     },
   };
+
+  if (primaryModelRef || fallbackModels.length > 0) {
+    config.agents.defaults.model = {};
+
+    if (primaryModelRef) {
+      config.agents.defaults.model.primary = primaryModelRef;
+    }
+
+    if (fallbackModels.length > 0) {
+      config.agents.defaults.model.fallbacks = fallbackModels;
+    }
+  }
+
+  if (Object.keys(allowedModels).length > 0) {
+    config.agents.defaults.models = allowedModels;
+  }
 
   const channelEntries = Object.entries({
     telegram: buildTelegramChannel(),
@@ -755,6 +885,46 @@ function channelOptionsMarkup(selectedChannel) {
       )}</option>`;
     })
     .join("");
+}
+
+function modelProviderOptionsMarkup(selectedProvider) {
+  return MODEL_PROVIDER_METADATA.map((provider) => {
+    const selected = provider.id === selectedProvider ? " selected" : "";
+    return `<option value="${escapeHtml(provider.id)}"${selected}>${escapeHtml(provider.label)} (${escapeHtml(provider.id)})</option>`;
+  }).join("");
+}
+
+function renderModelProviderCatalog(selectedProvider) {
+  dom.modelProviderList.innerHTML = MODEL_PROVIDER_METADATA.map((provider) => {
+    const selected = provider.id === selectedProvider;
+    const examples = provider.examples.length
+      ? provider.examples
+          .map((example) => `<code>${escapeHtml(`${provider.id}/${example}`)}</code>`)
+          .join("")
+      : '<span class="panel-note">支持任意官方目录中的模型 ID</span>';
+
+    return `
+      <article class="provider-card"${selected ? ' data-tone="accent"' : ""}>
+        <div class="provider-card-head">
+          <div>
+            <h3>${escapeHtml(provider.label)}</h3>
+            <p class="panel-note">${escapeHtml(provider.id)}</p>
+          </div>
+          ${selected ? '<span class="chip" data-tone="accent">当前 Provider</span>' : ""}
+        </div>
+        <div class="stack-list compact-stack">
+          <div class="stack-item">
+            <strong>认证</strong>
+            <p>${escapeHtml(provider.auth)}</p>
+          </div>
+          <div class="stack-item">
+            <strong>示例</strong>
+            <div class="provider-example-list">${examples}</div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderAgentList() {
@@ -944,6 +1114,16 @@ export function renderDesigner() {
   normalizeAgents();
   normalizeBindings();
 
+  const primaryModelRef = buildModelRef(
+    state.designer.modelProvider,
+    state.designer.modelId
+  );
+  const fallbackModels = listValues(state.designer.modelFallbacks);
+  const allowedModelLines = lineValues(state.designer.modelAllowlist);
+  const selectedProvider =
+    MODEL_PROVIDER_METADATA.find((provider) => provider.id === state.designer.modelProvider) ||
+    MODEL_PROVIDER_METADATA[0];
+
   const fieldValues = {
     workspace: state.designer.workspace,
     gatewayBind: state.designer.gatewayBind,
@@ -951,6 +1131,10 @@ export function renderDesigner() {
     gatewayAuth: state.designer.gatewayAuth,
     gatewayToken: state.designer.gatewayToken,
     gatewayPassword: state.designer.gatewayPassword,
+    modelProvider: state.designer.modelProvider,
+    modelId: state.designer.modelId,
+    modelFallbacks: state.designer.modelFallbacks,
+    modelAllowlist: state.designer.modelAllowlist,
   };
 
   dom.designerInputs.forEach((input) => {
@@ -965,6 +1149,20 @@ export function renderDesigner() {
 
   setHidden(dom.designerGatewayTokenWrap, state.designer.gatewayAuth !== "token");
   setHidden(dom.designerGatewayPasswordWrap, state.designer.gatewayAuth !== "password");
+  dom.modelProviderSelect.innerHTML = modelProviderOptionsMarkup(selectedProvider.id);
+  dom.modelExampleList.innerHTML = providerExamples(selectedProvider.id)
+    .map((example) => `<option value="${escapeHtml(example)}"></option>`)
+    .join("");
+  dom.modelPrimaryPreview.textContent = primaryModelRef || "未设置";
+  dom.modelProviderHint.textContent = `${selectedProvider.label} 使用 ${selectedProvider.auth} 认证。主模型请输入 model ID，最终会写成 ${selectedProvider.id}/<model>。`;
+  dom.modelSummaryPrimary.textContent = primaryModelRef || "未设置";
+  dom.modelSummaryFallbacks.textContent = fallbackModels.length
+    ? `${fallbackModels.length} 个回退模型`
+    : "未设置";
+  dom.modelSummaryAllowlist.textContent = allowedModelLines.length
+    ? `${allowedModelLines.length} 个允许项`
+    : "未设置";
+  renderModelProviderCatalog(selectedProvider.id);
 
   const modalChannel =
     CHANNEL_METADATA.find((item) => item.id === state.channelModal.type) || CHANNEL_METADATA[0];

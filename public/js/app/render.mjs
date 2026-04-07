@@ -18,6 +18,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function statusRowMarkup(label, value, tone = "neutral") {
+  const toneAttribute = tone === "neutral" ? "" : ` data-tone="${escapeHtml(tone)}"`;
+  return `<div class="status-row"${toneAttribute}><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
+}
+
 export function printConsole(title, payload = {}) {
   const sections = [title];
 
@@ -153,6 +158,11 @@ export function applyBusyState() {
       return;
     }
 
+    if (button === dom.uninstallButton) {
+      button.disabled = state.busy || state.uninstallLocked;
+      return;
+    }
+
     button.disabled = state.busy;
   });
 
@@ -161,85 +171,12 @@ export function applyBusyState() {
   dom.runOnboardButton.disabled = state.busy || state.onboardingLocked;
 }
 
-export function syncOnboardFieldVisibility() {
-  const needsModelApiKey = dom.authChoiceInput.value !== "skip";
-  const useToken = dom.gatewayAuthInput.value === "token";
-
-  setHidden(dom.modelApiKeyField, !needsModelApiKey);
-  dom.modelApiKeyInput.required = needsModelApiKey;
-
-  setHidden(dom.gatewayTokenField, !useToken);
-  dom.gatewayTokenInput.required = useToken;
-
-  setHidden(dom.gatewayPasswordField, useToken);
-  dom.gatewayPasswordInput.required = !useToken;
-}
-
-export function clearOnboardValidationState() {
-  dom.onboardForm
-    .querySelectorAll(".is-invalid")
-    .forEach((element) => element.classList.remove("is-invalid"));
-}
-
-export function markInvalidField(input) {
-  input.classList.add("is-invalid");
-  input.focus();
-}
-
-export function markInvalidSwitch(input) {
-  const row = input.closest(".switch-row");
-  if (row) {
-    row.classList.add("is-invalid");
-  }
-
-  input.focus();
-}
-
-export function validateOnboardForm() {
-  clearOnboardValidationState();
-
-  if (state.onboardingLocked) {
-    return "请先安装 OpenClaw，再运行初始化向导。";
-  }
-
-  if (dom.gatewayPortInput.value.trim()) {
-    const port = Number(dom.gatewayPortInput.value);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      markInvalidField(dom.gatewayPortInput);
-      return "Gateway 端口必须是 1-65535 之间的整数。";
-    }
-  }
-
-  if (dom.authChoiceInput.value !== "skip" && !dom.modelApiKeyInput.value.trim()) {
-    markInvalidField(dom.modelApiKeyInput);
-    return "选择模型认证后，需要填写对应的 API Key。";
-  }
-
-  if (dom.gatewayAuthInput.value === "password" && !dom.gatewayPasswordInput.value.trim()) {
-    markInvalidField(dom.gatewayPasswordInput);
-    return "Password 模式下必须提供 Gateway Password。";
-  }
-
-  if (!dom.riskAcceptedInput.checked) {
-    markInvalidSwitch(dom.riskAcceptedInput);
-    return "请先确认你理解 agent 具备本机执行能力。";
-  }
-
-  return "";
-}
-
-export function fillOnboardForm(values) {
-  dom.authChoiceInput.value = values.authChoice || "skip";
-  dom.modelApiKeyInput.value = values.modelApiKey || "";
-  dom.workspaceInput.value = values.workspace || "~/.openclaw/workspace";
-  dom.gatewayBindInput.value = values.gatewayBind || "loopback";
-  dom.gatewayPortInput.value = String(values.gatewayPort || 18789);
-  dom.gatewayAuthInput.value = values.gatewayAuth || "token";
-  dom.gatewayTokenInput.value = values.gatewayToken || "";
-  dom.gatewayPasswordInput.value = values.gatewayPassword || "";
-  dom.installDaemonInput.checked = Boolean(values.installDaemon);
-  dom.riskAcceptedInput.checked = Boolean(values.riskAccepted);
-  syncOnboardFieldVisibility();
+export function renderOnboardDefaults(values = {}) {
+  dom.onboardDefaultWorkspace.textContent = values.workspace || "~/.openclaw/workspace";
+  dom.onboardDefaultBind.textContent = values.gatewayBind || "loopback";
+  dom.onboardDefaultPort.textContent = String(values.gatewayPort || 18789);
+  dom.onboardDefaultAuth.textContent = values.gatewayAuth || "token";
+  dom.onboardDefaultDaemon.textContent = values.installDaemon === false ? "不安装 daemon" : "安装并托管 daemon";
 }
 
 export function renderConfig(config) {
@@ -387,6 +324,7 @@ export function renderSkills(data) {
   dom.skillsSearchInput.value = state.skills.search;
   dom.skillsFilterInput.value = state.skills.filter;
   dom.skillsSummaryChip.textContent = `${rows.length} 个技能`;
+  setChipTone(dom.skillsSummaryChip, "accent");
 
   if (data.store.error) {
     dom.skillsStoreHint.textContent = `商店读取失败: ${data.store.error}`;
@@ -426,13 +364,13 @@ export function renderSkills(data) {
               <td>${escapeHtml(skill.version)}</td>
               <td>${escapeHtml(skill.downloads)}</td>
               <td>
-                <span class="chip chip-quiet">${skill.installed ? "已安装" : "未安装"}</span>
+                <span class="chip chip-quiet"${skill.installed ? ' data-tone="success"' : ""}>${skill.installed ? "已安装" : "未安装"}</span>
               </td>
               <td>${escapeHtml(skill.source)}</td>
               <td>
                 ${
                   skill.installed
-                    ? '<span class="chip chip-quiet">已安装</span>'
+                    ? '<span class="chip chip-quiet" data-tone="success">已安装</span>'
                     : skill.slug
                       ? `<button class="ghost" data-skill-install="${escapeHtml(skill.slug)}" data-skill-name="${escapeHtml(skill.name)}" type="button">安装</button>`
                       : '<span class="panel-note">本地</span>'
@@ -464,45 +402,30 @@ export function renderStatus(status) {
     ? status.openclaw.latestVersion
     : status.openclaw.latestVersionError || "未知";
 
-  const updateText = !status.openclaw.installed
-    ? "未安装"
-    : status.openclaw.upToDate
-      ? "已是最新版"
-      : status.openclaw.updateAvailable
-        ? "有可用更新"
-        : "无法判断";
-
   const items = [
-    ["管理页面", status.manager.url],
-    ["Web 配置", status.manager.configPath],
-    ["Web 登录", boolLabel(status.manager.authEnabled, "已启用", "未启用")],
-    ["平台", `${status.system.platform} / ${status.system.arch}`],
-    ["系统版本", status.system.release],
-    ["Node", status.system.nodeVersion],
-    ["包管理器", status.system.packageManager],
-    ["curl", boolLabel(status.system.commands.curl, "可用", "缺失")],
-    ["git", boolLabel(status.system.commands.git, "可用", "缺失")],
-    ["OpenClaw 已安装", boolLabel(status.openclaw.installed, "已安装", "未安装")],
-    ["OpenClaw 路径", status.openclaw.binary || "未找到"],
-    ["OpenClaw 版本", status.openclaw.version || "未知"],
-    ["最新版本", latestVersionText],
-    ["更新状态", updateText],
-    ["配置文件", status.openclaw.configPath],
-    ["本地前缀", status.openclaw.localPrefix],
-    ["Dashboard", status.openclaw.dashboardUrl],
+    { label: "平台", value: `${status.system.platform} / ${status.system.arch}` },
+    { label: "系统版本", value: status.system.release },
+    { label: "Node", value: status.system.nodeVersion },
+    { label: "包管理器", value: status.system.packageManager },
+    { label: "curl", value: boolLabel(status.system.commands.curl, "可用", "缺失") },
+    { label: "git", value: boolLabel(status.system.commands.git, "可用", "缺失") },
+    { label: "OpenClaw 已安装", value: boolLabel(status.openclaw.installed, "已安装", "未安装") },
+    { label: "OpenClaw 路径", value: status.openclaw.binary || "未找到" },
+    { label: "OpenClaw 版本", value: status.openclaw.version || "未知" },
+    { label: "最新版本", value: latestVersionText },
+    { label: "配置文件", value: status.openclaw.configPath },
+    { label: "本地前缀", value: status.openclaw.localPrefix },
   ];
 
   dom.statusList.innerHTML = items
-    .map(
-      ([label, value]) =>
-        `<div class="status-row"><dt>${label}</dt><dd>${String(value)}</dd></div>`
-    )
+    .map(({ label, value }) => statusRowMarkup(label, value))
     .join("");
 
   document.title = status.manager.title;
   dom.appTitle.textContent = status.manager.title;
   dom.appSubtitle.textContent = status.manager.subtitle;
   dom.platformChip.textContent = `${status.system.platform} ${status.system.arch}`;
+  setChipTone(dom.platformChip, "accent");
   dom.logoutButton.hidden = !status.manager.authEnabled;
 
   dom.heroInstallState.textContent = boolLabel(status.openclaw.installed, "已安装", "未安装");
@@ -535,23 +458,6 @@ export function renderStatus(status) {
   dom.heroConfigDetail.textContent = status.openclaw.configPath;
   setSurfaceTone(dom.configSummaryCard, status.openclaw.configExists ? "success" : "warning");
 
-  dom.gatewayServiceInstalled.textContent = boolLabel(
-    status.openclaw.serviceInstalled,
-    "已安装",
-    "未安装"
-  );
-  setSurfaceTone(dom.gatewayInstalledCard, statusTone(status.openclaw.serviceInstalled, "danger"));
-
-  dom.gatewayServiceLoaded.textContent = boolLabel(
-    status.openclaw.serviceLoaded,
-    "已加载",
-    "未加载"
-  );
-  setSurfaceTone(
-    dom.gatewayLoadedCard,
-    status.openclaw.serviceLoaded ? "success" : status.openclaw.serviceInstalled ? "warning" : "danger"
-  );
-
   dom.dashboardLink.href = status.openclaw.dashboardUrl;
   dom.configPath.textContent = status.openclaw.configPath;
   dom.configPath.title = status.openclaw.configPath;
@@ -559,15 +465,19 @@ export function renderStatus(status) {
   if (!status.openclaw.installed) {
     dom.installButton.textContent = "安装 OpenClaw";
     state.installLocked = false;
+    state.uninstallLocked = true;
   } else if (status.openclaw.upToDate) {
     dom.installButton.textContent = "已是最新版本";
     state.installLocked = true;
+    state.uninstallLocked = false;
   } else if (status.openclaw.updateAvailable) {
     dom.installButton.textContent = "更新 OpenClaw";
     state.installLocked = false;
+    state.uninstallLocked = false;
   } else {
     dom.installButton.textContent = "安装 / 更新 OpenClaw";
     state.installLocked = false;
+    state.uninstallLocked = false;
   }
 
   if (!status.openclaw.installed) {

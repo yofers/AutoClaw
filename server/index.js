@@ -14,6 +14,9 @@ const MAX_JOBS = 20;
 const VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_WEB_CONFIG = `# AutoOpenClaw Web manager configuration
 # Changes to host/port require restarting the manager process.
+# To allow remote access on a VPS:
+# 1. set server.host to "0.0.0.0"
+# 2. set security.loopbackOnly to false
 
 server:
   host: "127.0.0.1"
@@ -1047,11 +1050,20 @@ async function installSkillBySlug({ slug, scope, workspace }) {
 }
 
 function gatewayServiceInstalled(statusText) {
-  return !/Service not installed|Service unit not found/i.test(String(statusText || ""));
+  const text = String(statusText || "").trim();
+  if (!text) {
+    return false;
+  }
+
+  return !/Service not installed|Service unit not found/i.test(text);
 }
 
 function gatewayServiceLoaded(statusText) {
-  const text = String(statusText || "");
+  const text = String(statusText || "").trim();
+  if (!text) {
+    return false;
+  }
+
   return (
     gatewayServiceInstalled(text) &&
     !/not loaded|RPC probe:\s*failed|Runtime:\s*unknown/i.test(text)
