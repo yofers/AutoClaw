@@ -1,8 +1,7 @@
 # AutoOpenClaw Web manager configuration
 # Changes to host/port require restarting the manager process.
-# To allow remote access on a VPS:
-# 1. set server.host to "0.0.0.0"
-# 2. set security.loopbackOnly to false
+# server.host is used for links and page display.
+# The manager listens on 0.0.0.0 by default; use security.loopbackOnly to restrict access.
 
 server:
   host: "127.0.0.1"

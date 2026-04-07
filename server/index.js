@@ -14,9 +14,8 @@ const MAX_JOBS = 20;
 const VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_WEB_CONFIG = `# AutoOpenClaw Web manager configuration
 # Changes to host/port require restarting the manager process.
-# To allow remote access on a VPS:
-# 1. set server.host to "0.0.0.0"
-# 2. set security.loopbackOnly to false
+# server.host is used for links and page display.
+# The manager listens on 0.0.0.0 by default; use security.loopbackOnly to restrict access.
 
 server:
   host: "127.0.0.1"
@@ -265,7 +264,7 @@ function renderHtmlTemplate(raw) {
   return String(raw)
     .replaceAll("{{APP_TITLE}}", escapeHtml(WEB_CONFIG.site.title))
     .replaceAll("{{APP_SUBTITLE}}", escapeHtml(WEB_CONFIG.site.subtitle))
-    .replaceAll("{{APP_HOST}}", escapeHtml(HOST));
+    .replaceAll("{{APP_HOST}}", escapeHtml(DISPLAY_HOST));
 }
 
 function parseCookies(header) {
@@ -294,7 +293,8 @@ function safeEqual(left, right) {
 }
 
 const WEB_CONFIG = loadWebConfig();
-const HOST = process.env.HOST || WEB_CONFIG.server.host;
+const DISPLAY_HOST = process.env.HOST || WEB_CONFIG.server.host;
+const LISTEN_HOST = process.env.LISTEN_HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || WEB_CONFIG.server.port);
 
 function json(data, statusCode = 200, extraHeaders = {}) {
@@ -532,10 +532,10 @@ function buildDashboardUrl(rawValue) {
 
   try {
     const url = new URL(candidate);
-    url.hostname = HOST;
+    url.hostname = DISPLAY_HOST;
     return url.toString();
   } catch {
-    return fallback.replace("127.0.0.1", HOST);
+    return fallback.replace("127.0.0.1", DISPLAY_HOST);
   }
 }
 
@@ -1174,9 +1174,10 @@ async function getStatus() {
     manager: {
       title: WEB_CONFIG.site.title,
       subtitle: WEB_CONFIG.site.subtitle,
-      host: HOST,
+      host: DISPLAY_HOST,
+      listenHost: LISTEN_HOST,
       port: PORT,
-      url: `http://${HOST}:${PORT}/`,
+      url: `http://${DISPLAY_HOST}:${PORT}/`,
       configPath: WEB_CONFIG_PATH,
       authEnabled: WEB_CONFIG.auth.enabled,
       sessionTtlHours: WEB_CONFIG.auth.sessionTtlHours,
@@ -1805,9 +1806,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, LISTEN_HOST, () => {
   process.stdout.write(
-    `AutoOpenClaw manager running at http://${HOST}:${PORT}/\n`
+    `AutoOpenClaw manager listening on http://${LISTEN_HOST}:${PORT}/ and serving links as http://${DISPLAY_HOST}:${PORT}/\n`
   );
 });
 

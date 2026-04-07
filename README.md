@@ -83,15 +83,18 @@ Web 管理页配置统一放在 `config/web.yaml`，包括：
 - `auth.*`
 - `security.loopbackOnly`
 
-如果你要在 VPS 上远程访问管理页，至少要改这两项：
+如果你要在 VPS 上远程访问管理页，至少要关闭回环限制：
 
 ```yaml
-server:
-  host: "0.0.0.0"
-
 security:
   loopbackOnly: false
 ```
+
+其中：
+
+- `server.host` 用于页面里的链接和地址展示
+- 服务监听默认使用 `0.0.0.0`
+- 是否允许外部访问由 `security.loopbackOnly` 控制
 
 同时请自行配好防火墙、反向代理和强密码。默认配置仍然偏向本地使用。
 
