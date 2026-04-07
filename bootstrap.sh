@@ -3,6 +3,7 @@ set -euo pipefail
 
 LAUNCH_DIR="$(pwd -P)"
 ROOT_DIR="${AUTOOPENCLAW_ROOT_DIR:-${LAUNCH_DIR}}"
+AUTOOPENCLAW_SCRIPT_VERSION="0.1.1"
 DEFAULT_REMOTE_REPO="yofers/AutoClaw"
 REMOTE_REPO="${AUTOOPENCLAW_REPO:-${DEFAULT_REMOTE_REPO}}"
 REMOTE_REF="${AUTOOPENCLAW_REF:-main}"
@@ -540,6 +541,161 @@ read_package_version() {
   sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "${file}" | head -n 1
 }
 
+read_script_version_from_file() {
+  local file="$1"
+  if [[ ! -f "${file}" ]]; then
+    return 1
+  fi
+
+  sed -nE 's/^AUTOOPENCLAW_SCRIPT_VERSION="([^"]+)".*/\1/p' "${file}" | head -n 1
+}
+
+extract_script_version() {
+  sed -nE 's/^AUTOOPENCLAW_SCRIPT_VERSION="([^"]+)".*/\1/p' | head -n 1
+}
+
+git_origin_repo() {
+  local origin_url repo
+
+  if [[ ! -d "${ROOT_DIR}/.git" ]]; then
+    return 1
+  fi
+
+  origin_url="$(git -C "${ROOT_DIR}" remote get-url origin 2>/dev/null || true)"
+  if [[ -z "${origin_url}" ]]; then
+    return 1
+  fi
+
+  repo="${origin_url}"
+  repo="${repo#git@github.com:}"
+  repo="${repo#ssh://git@github.com/}"
+  repo="${repo#https://github.com/}"
+  repo="${repo#http://github.com/}"
+  repo="${repo%.git}"
+
+  if [[ "${repo}" == "${origin_url}" || "${repo}" != */* ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${repo}"
+}
+
+git_current_branch() {
+  if [[ ! -d "${ROOT_DIR}/.git" ]]; then
+    return 1
+  fi
+
+  git -C "${ROOT_DIR}" branch --show-current 2>/dev/null || true
+}
+
+effective_remote_repo() {
+  if [[ -n "${AUTOOPENCLAW_REPO:-}" ]]; then
+    printf '%s\n' "${AUTOOPENCLAW_REPO}"
+    return
+  fi
+
+  local repo
+  repo="$(git_origin_repo || true)"
+  if [[ -n "${repo}" ]]; then
+    printf '%s\n' "${repo}"
+    return
+  fi
+
+  printf '%s\n' "${REMOTE_REPO}"
+}
+
+effective_remote_ref() {
+  if [[ -n "${AUTOOPENCLAW_REF:-}" ]]; then
+    printf '%s\n' "${AUTOOPENCLAW_REF}"
+    return
+  fi
+
+  local branch
+  branch="$(git_current_branch || true)"
+  if [[ -n "${branch}" ]]; then
+    printf '%s\n' "${branch}"
+    return
+  fi
+
+  printf '%s\n' "${REMOTE_REF}"
+}
+
+version_core() {
+  local version="$1"
+  version="${version#v}"
+  version="${version%%+*}"
+  version="${version%%-*}"
+  printf '%s\n' "${version}"
+}
+
+version_prerelease() {
+  local version="$1"
+  version="${version#v}"
+  version="${version%%+*}"
+  if [[ "${version}" == *-* ]]; then
+    printf '%s\n' "${version#*-}"
+  fi
+}
+
+compare_versions() {
+  local left="$1"
+  local right="$2"
+  local left_core right_core
+  local left_pre right_pre
+  local IFS=.
+  local left_parts right_parts
+  local index max_index left_part right_part
+
+  left_core="$(version_core "${left}")"
+  right_core="$(version_core "${right}")"
+  left_pre="$(version_prerelease "${left}")"
+  right_pre="$(version_prerelease "${right}")"
+
+  read -r -a left_parts <<< "${left_core}"
+  read -r -a right_parts <<< "${right_core}"
+  max_index="${#left_parts[@]}"
+  if (( ${#right_parts[@]} > max_index )); then
+    max_index="${#right_parts[@]}"
+  fi
+
+  for (( index = 0; index < max_index; index += 1 )); do
+    left_part="${left_parts[index]:-0}"
+    right_part="${right_parts[index]:-0}"
+
+    if [[ ! "${left_part}" =~ ^[0-9]+$ || ! "${right_part}" =~ ^[0-9]+$ ]]; then
+      break
+    fi
+
+    if (( 10#${left_part} < 10#${right_part} )); then
+      printf '%s\n' "-1"
+      return
+    fi
+
+    if (( 10#${left_part} > 10#${right_part} )); then
+      printf '%s\n' "1"
+      return
+    fi
+  done
+
+  if [[ -z "${left_pre}" && -n "${right_pre}" ]]; then
+    printf '%s\n' "1"
+    return
+  fi
+
+  if [[ -n "${left_pre}" && -z "${right_pre}" ]]; then
+    printf '%s\n' "-1"
+    return
+  fi
+
+  if [[ "${left_pre}" < "${right_pre}" ]]; then
+    printf '%s\n' "-1"
+  elif [[ "${left_pre}" > "${right_pre}" ]]; then
+    printf '%s\n' "1"
+  else
+    printf '%s\n' "0"
+  fi
+}
+
 panel_local_version() {
   if ! is_project_dir "${ROOT_DIR}"; then
     return 0
@@ -549,7 +705,10 @@ panel_local_version() {
 
 fetch_remote_file() {
   local relative_path="$1"
-  curl -fsSL "https://raw.githubusercontent.com/${REMOTE_REPO}/${REMOTE_REF}/${relative_path}"
+  local repo ref
+  repo="$(effective_remote_repo)"
+  ref="$(effective_remote_ref)"
+  curl -fsSL "https://raw.githubusercontent.com/${repo}/${ref}/${relative_path}"
 }
 
 refresh_script_status() {
@@ -574,6 +733,35 @@ refresh_script_status() {
     SCRIPT_STATUS_TEXT="可安装"
     SCRIPT_STATUS_TONE="warning"
     return
+  fi
+
+  local local_version remote_version compare_result
+  local_version="$(read_script_version_from_file "${ROOT_DIR}/bootstrap.sh" || true)"
+  remote_version="$(printf '%s\n' "${remote_bootstrap}" | extract_script_version || true)"
+
+  if [[ -n "${local_version}" && -n "${remote_version}" ]]; then
+    compare_result="$(compare_versions "${local_version}" "${remote_version}")"
+
+    if [[ "${compare_result}" == "0" ]]; then
+      SCRIPT_STATUS="latest"
+      SCRIPT_STATUS_TEXT="已是最新 ${local_version}"
+      SCRIPT_STATUS_TONE="success"
+      return
+    fi
+
+    if [[ "${compare_result}" == "-1" ]]; then
+      SCRIPT_STATUS="outdated"
+      SCRIPT_STATUS_TEXT="可更新 ${local_version} -> ${remote_version}"
+      SCRIPT_STATUS_TONE="warning"
+      return
+    fi
+
+    if [[ "${compare_result}" == "1" ]]; then
+      SCRIPT_STATUS="local-newer"
+      SCRIPT_STATUS_TEXT="本地脚本较新 ${local_version} > ${remote_version}"
+      SCRIPT_STATUS_TONE="success"
+      return
+    fi
   fi
 
   local local_sum remote_sum
@@ -618,13 +806,24 @@ refresh_panel_status() {
     return
   fi
 
-  if [[ "${PANEL_LOCAL_VERSION}" == "${PANEL_REMOTE_VERSION}" ]]; then
+  local compare_result
+  compare_result="$(compare_versions "${PANEL_LOCAL_VERSION}" "${PANEL_REMOTE_VERSION}")"
+
+  if [[ "${compare_result}" == "0" ]]; then
     PANEL_STATUS="latest"
     PANEL_STATUS_TEXT="已是最新 ${PANEL_LOCAL_VERSION}"
     PANEL_STATUS_TONE="success"
-  else
+  elif [[ "${compare_result}" == "-1" ]]; then
     PANEL_STATUS="outdated"
     PANEL_STATUS_TEXT="可更新 ${PANEL_LOCAL_VERSION} -> ${PANEL_REMOTE_VERSION}"
+    PANEL_STATUS_TONE="warning"
+  elif [[ "${compare_result}" == "1" ]]; then
+    PANEL_STATUS="local-newer"
+    PANEL_STATUS_TEXT="本地版本较新 ${PANEL_LOCAL_VERSION} > ${PANEL_REMOTE_VERSION}"
+    PANEL_STATUS_TONE="success"
+  else
+    PANEL_STATUS="mismatch"
+    PANEL_STATUS_TEXT="版本不一致 ${PANEL_LOCAL_VERSION} / ${PANEL_REMOTE_VERSION}"
     PANEL_STATUS_TONE="warning"
   fi
 }
@@ -638,6 +837,7 @@ panel_action_label() {
   case "${PANEL_STATUS}" in
     not-installed) printf '安装面板' ;;
     outdated) printf '更新面板' ;;
+    local-newer) printf '当前版本更新' ;;
     latest) printf '面板已是最新' ;;
     *) printf '安装 / 更新面板' ;;
   esac
@@ -646,6 +846,7 @@ panel_action_label() {
 script_action_label() {
   case "${SCRIPT_STATUS}" in
     latest) printf '脚本已是最新' ;;
+    local-newer) printf '当前脚本更新' ;;
     missing) printf '安装脚本' ;;
     outdated) printf '更新脚本' ;;
     *) printf '更新脚本' ;;
@@ -842,14 +1043,17 @@ install_or_update_panel() {
       cp "$(web_config_path)" "${preserved_config}"
     fi
 
+    local effective_ref
+    effective_ref="$(effective_remote_ref)"
+
     if [[ -d "${ROOT_DIR}/.git" ]] && git -C "${ROOT_DIR}" remote get-url origin >/dev/null 2>&1; then
-      git -C "${ROOT_DIR}" pull --ff-only origin "${REMOTE_REF}"
+      git -C "${ROOT_DIR}" pull --ff-only origin "${effective_ref}"
     else
       local temp_dir
       temp_dir="$(mktemp -d "${CACHE_ROOT}/update-XXXXXX")"
       rm -rf "${temp_dir}"
       mkdir -p "${temp_dir}"
-      download_repo_archive_to_dir "${REMOTE_REPO}" "${REMOTE_REF}" "${temp_dir}"
+      download_repo_archive_to_dir "$(effective_remote_repo)" "${effective_ref}" "${temp_dir}"
       cp -R "${temp_dir}/." "${ROOT_DIR}/"
       rm -rf "${temp_dir}"
     fi

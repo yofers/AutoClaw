@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $LaunchDir = (Get-Location).Path
+$AutoOpenClawScriptVersion = "0.1.1"
 $RootDir = if ($env:AUTOOPENCLAW_ROOT_DIR) { $env:AUTOOPENCLAW_ROOT_DIR } else { $LaunchDir }
 $HostIp = if ($env:HOST) { $env:HOST } else { "127.0.0.1" }
 $Port = if ($env:PORT) { $env:PORT } else { "31870" }
