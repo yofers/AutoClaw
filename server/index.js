@@ -264,7 +264,8 @@ function escapeHtml(value) {
 function renderHtmlTemplate(raw) {
   return String(raw)
     .replaceAll("{{APP_TITLE}}", escapeHtml(WEB_CONFIG.site.title))
-    .replaceAll("{{APP_SUBTITLE}}", escapeHtml(WEB_CONFIG.site.subtitle));
+    .replaceAll("{{APP_SUBTITLE}}", escapeHtml(WEB_CONFIG.site.subtitle))
+    .replaceAll("{{APP_HOST}}", escapeHtml(HOST));
 }
 
 function parseCookies(header) {
@@ -523,6 +524,19 @@ function extractFirstUrl(value) {
   const text = String(value || "");
   const match = text.match(/https?:\/\/[^\s)]+/);
   return match ? match[0] : "";
+}
+
+function buildDashboardUrl(rawValue) {
+  const fallback = DEFAULT_DASHBOARD_URL;
+  const candidate = extractFirstUrl(rawValue) || fallback;
+
+  try {
+    const url = new URL(candidate);
+    url.hostname = HOST;
+    return url.toString();
+  } catch {
+    return fallback.replace("127.0.0.1", HOST);
+  }
 }
 
 function extractConfigBlock(raw, blockName) {
@@ -1142,8 +1156,7 @@ async function getStatus() {
   const gatewayStatusText = trimOutput(gatewayStatus.stdout || gatewayStatus.stderr || "");
   const serviceInstalled = gatewayServiceInstalled(gatewayStatusText);
   const serviceLoaded = gatewayServiceLoaded(gatewayStatusText);
-  const dashboardUrl =
-    extractFirstUrl(dashboardInfo.stdout || dashboardInfo.stderr || "") || DEFAULT_DASHBOARD_URL;
+  const dashboardUrl = buildDashboardUrl(dashboardInfo.stdout || dashboardInfo.stderr || "");
   const versionKnown = Boolean(installedVersion);
   const latestKnown = Boolean(latestVersion);
   const updateAvailable =
